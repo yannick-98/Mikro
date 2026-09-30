@@ -1,0 +1,46 @@
+# Despliegue de Mikro en Netlify: la web como sitio estatico y el API de
+# Express como funcion serverless, bajo el mismo dominio.
+
+[build]
+  command = "npm run build:netlify"
+  publish = "frontend/dist"
+  functions = "netlify/functions"
+
+[build.environment]
+  NODE_VERSION = "20"
+  # Evita que Netlify reinstale con --production y se deje las de desarrollo.
+  NPM_FLAGS = "--no-audit --no-fund"
+
+[functions]
+  # El trazador por defecto sigue mejor los binarios nativos de Prisma que esbuild.
+  node_bundler = "nft"
+  external_node_modules = ["@prisma/client", ".prisma"]
+  included_files = [
+    "backend/prisma/dev.db",
+    "backend/prisma/schema.prisma",
+    "backend/node_modules/.prisma/**",
+    "backend/node_modules/@prisma/client/**"
+  ]
+
+# El frontend llama a /api/...; aqui se redirige a la funcion.
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api/:splat"
+  status = 200
+  force = true
+
+# Cualquier otra ruta la resuelve React Router en el cliente.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  for = "/api/*"
+  [headers.values]
+    Cache-Control = "no-store"
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"

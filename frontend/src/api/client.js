@@ -1,6 +1,8 @@
 /** Cliente HTTP de la API de Mikro. */
 
-const BASE = '/api'
+// En local y en Netlify se usa la ruta relativa (un redirect la lleva a la
+// funcion); VITE_API_URL permite apuntar a un API alojado en otro dominio.
+const BASE = import.meta.env.VITE_API_URL || '/api'
 const TOKEN_KEY = 'mikro.token'
 
 export const tokenStore = {
