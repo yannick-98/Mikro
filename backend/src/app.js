@@ -15,6 +15,13 @@ import searchRoutes from './routes/search.js'
 import rankingRoutes from './routes/rankings.js'
 import miscRoutes from './routes/misc.js'
 
+/**
+ * Devuelve el router aunque el empaquetador lo haya envuelto en { default }.
+ * Al desplegar como funcion serverless el modulo puede llegar transformado, y
+ * sin esto Express falla con "requires a middleware function but got a Object".
+ */
+const router = (mod) => (typeof mod === 'function' ? mod : mod?.default)
+
 export function createApp() {
   const app = express()
 
@@ -37,15 +44,15 @@ export function createApp() {
 
   app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'mikro-api', time: new Date().toISOString() }))
 
-  app.use('/api/auth', authRoutes)
-  app.use('/api/creators', creatorRoutes)
-  app.use('/api/brands', brandRoutes)
-  app.use('/api/campaigns', campaignRoutes)
-  app.use('/api/applications', applicationRoutes)
-  app.use('/api/deals', dealRoutes)
-  app.use('/api/search', searchRoutes)
-  app.use('/api/rankings', rankingRoutes)
-  app.use('/api', miscRoutes)
+  app.use('/api/auth', router(authRoutes))
+  app.use('/api/creators', router(creatorRoutes))
+  app.use('/api/brands', router(brandRoutes))
+  app.use('/api/campaigns', router(campaignRoutes))
+  app.use('/api/applications', router(applicationRoutes))
+  app.use('/api/deals', router(dealRoutes))
+  app.use('/api/search', router(searchRoutes))
+  app.use('/api/rankings', router(rankingRoutes))
+  app.use('/api', router(miscRoutes))
 
   app.use(notFoundHandler)
   app.use(errorHandler)

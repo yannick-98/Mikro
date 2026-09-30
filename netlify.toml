@@ -15,11 +15,12 @@
   # El trazador por defecto sigue mejor los binarios nativos de Prisma que esbuild.
   node_bundler = "nft"
   external_node_modules = ["@prisma/client", ".prisma"]
+  # Con workspaces de npm el cliente de Prisma queda en la raiz, no en backend/.
   included_files = [
     "backend/prisma/dev.db",
     "backend/prisma/schema.prisma",
-    "backend/node_modules/.prisma/**",
-    "backend/node_modules/@prisma/client/**"
+    "node_modules/.prisma/client/**",
+    "node_modules/@prisma/client/**"
   ]
 
 # El frontend llama a /api/...; aqui se redirige a la funcion.

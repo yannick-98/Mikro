@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import prisma from '../lib/prisma.js'
+import { prisma } from '../lib/prisma.js'
 import { asyncHandler } from '../lib/http.js'
 import { requireAuth, requireRole } from '../middleware/auth.js'
 import { recomputeRanking } from '../services/creatorStats.js'

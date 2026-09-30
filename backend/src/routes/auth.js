@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { z } from 'zod'
-import prisma from '../lib/prisma.js'
+import { prisma } from '../lib/prisma.js'
 import { hashPassword, signToken, verifyPassword } from '../lib/auth.js'
 import { asyncHandler, conflict, parseBody, unauthorized } from '../lib/http.js'
 import { requireAuth } from '../middleware/auth.js'

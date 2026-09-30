@@ -16,33 +16,53 @@ import os from 'node:os'
 import serverless from 'serverless-http'
 
 const TMP_DB = path.join(os.tmpdir(), 'mikro.db')
+const DB_RELATIVE = path.join('backend', 'prisma', 'dev.db')
+
+/** Raices donde puede haber quedado el paquete de la funcion. */
+function candidateRoots() {
+  const roots = [process.cwd(), process.env.LAMBDA_TASK_ROOT, '/var/task']
+
+  // La ruta de este modulo, si el empaquetado la conserva.
+  try {
+    if (typeof import.meta.url === 'string') {
+      const here = path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'))
+      roots.push(path.resolve(here, '..', '..'), here)
+    }
+  } catch {
+    // Sin import.meta.url utilizable se usan las demas raices.
+  }
+
+  return [...new Set(roots.filter(Boolean))]
+}
 
 /** Deja la base en /tmp y devuelve su ruta. */
 function prepareDatabase() {
   if (fs.existsSync(TMP_DB)) return TMP_DB
 
-  // La ruta cambia segun como empaquete Netlify la funcion, asi que se prueban
-  // las ubicaciones posibles en vez de fijar una.
-  const candidates = [
-    path.resolve(process.cwd(), 'backend/prisma/dev.db'),
-    path.resolve(process.cwd(), 'prisma/dev.db'),
-    new URL('../../backend/prisma/dev.db', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'),
-  ]
-
-  const source = candidates.find((c) => {
-    try {
-      return fs.existsSync(c)
-    } catch {
-      return false
+  const tried = []
+  for (const root of candidateRoots()) {
+    for (const relative of [DB_RELATIVE, path.join('prisma', 'dev.db'), 'dev.db']) {
+      const candidate = path.join(root, relative)
+      tried.push(candidate)
+      try {
+        if (fs.existsSync(candidate)) {
+          fs.copyFileSync(candidate, TMP_DB)
+          return TMP_DB
+        }
+      } catch {
+        // Ruta inaccesible: se prueba la siguiente.
+      }
     }
-  })
-
-  if (!source) {
-    throw new Error(`No se encuentra la base de datos sembrada. Buscado en: ${candidates.join(', ')}`)
   }
 
-  fs.copyFileSync(source, TMP_DB)
-  return TMP_DB
+  // El detalle ahorra un despliegue a ciegas si cambia el empaquetado.
+  let listing = ''
+  try {
+    listing = fs.readdirSync(process.cwd()).join(', ')
+  } catch {
+    listing = '(no legible)'
+  }
+  throw new Error(`Base de datos no encontrada. Probado: ${tried.join(' | ')}. Contenido de ${process.cwd()}: ${listing}`)
 }
 
 let cached = null

@@ -4,9 +4,14 @@
 Una pyme publica lo que necesita, encuentra creadores de su ciudad y su nicho, acuerda
 el precio y paga con el dinero retenido hasta aprobar el contenido. Sin agencias.
 
-MVP completo y funcional en local: catálogo y ranking públicos, búsqueda en lenguaje
-natural, campañas, candidaturas, ciclo de colaboración con pago en garantía,
-mensajería, valoraciones y backoffice.
+MVP completo y desplegado: catálogo y ranking públicos, búsqueda en lenguaje natural,
+campañas, candidaturas, ciclo de colaboración con pago en garantía, mensajería,
+valoraciones y backoffice.
+
+**Demo en vivo: https://mikro-marketplace.netlify.app**
+
+Se puede entrar con las cuentas de prueba de más abajo. Las 54 pruebas de extremo a
+extremo pasan tanto en local como contra el despliegue.
 
 - **Estrategia de negocio:** [`docs/NEGOCIO.md`](docs/NEGOCIO.md)
 - **Referencia de la API:** [`docs/API.md`](docs/API.md)
@@ -69,6 +74,46 @@ campaña, candidatura, ciclo completo de colaboración, pago, valoración y perm
 Son 54 comprobaciones.
 
 ---
+
+## Despliegue
+
+El repositorio está preparado para Netlify: la web se sirve como sitio estático y el
+API de Express corre como una función serverless en el mismo dominio, de modo que el
+frontend sigue llamando a `/api/...` sin cambios.
+
+| Pieza | Dónde | Configuración |
+|---|---|---|
+| Web | Netlify (estático) | `frontend/dist`, con redirección SPA a `index.html` |
+| API | Netlify Functions | `netlify/functions/api.js` envuelve el mismo Express con `serverless-http` |
+| Datos | SQLite sembrada en el build | Se copia a `/tmp` en el arranque en frío de la función |
+
+Todo está en [`netlify.toml`](netlify.toml). El comando de build (`npm run
+build:netlify`) genera el cliente de Prisma, crea y siembra la base, y compila la web.
+
+Para volver a desplegar desde local:
+
+```bash
+npm run build:netlify && netlify deploy --prod --dir frontend/dist --functions netlify/functions --no-build
+```
+
+En Windows conviene parar antes el servidor de desarrollo: mantiene abierto el motor de
+Prisma y `prisma generate` no puede reemplazarlo.
+
+**Límite importante de esta demo:** el sistema de ficheros de una función serverless es
+efímero. Los cambios que se hagan en la demo pública (nuevas campañas, candidaturas,
+colaboraciones) viven mientras dure la instancia de la función y se pierden cuando se
+recicla, volviendo a los datos de partida. Es suficiente para enseñar el producto, pero
+no es persistencia real.
+
+Para un entorno con datos permanentes hay dos caminos, y ambos tocan un solo punto del
+código (el `datasource` de Prisma):
+
+1. **Postgres gestionado** (Neon, Supabase o el Postgres de Netlify): se cambia el
+   proveedor en `backend/prisma/schema.prisma` y se define `DATABASE_URL` en las
+   variables de entorno del sitio.
+2. **Backend en un host con estado** (Render, Railway o un VPS): se despliega
+   `backend/` tal cual y se define `VITE_API_URL` en Netlify apuntando a ese dominio.
+   El cliente ya contempla esa variable.
 
 ## Qué incluye
 

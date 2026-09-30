@@ -1,6 +1,12 @@
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const here = path.dirname(fileURLToPath(import.meta.url))
+
 /** @type {import('tailwindcss').Config} */
 export default {
-  content: ['./index.html', './src/**/*.{js,jsx}'],
+  // Rutas absolutas: el build se lanza desde la raiz del repositorio.
+  content: [path.join(here, 'index.html'), path.join(here, 'src/**/*.{js,jsx}')],
   theme: {
     extend: {
       colors: {

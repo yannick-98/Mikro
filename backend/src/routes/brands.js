@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { z } from 'zod'
-import prisma from '../lib/prisma.js'
+import { prisma } from '../lib/prisma.js'
 import { asyncHandler, notFound, parseBody } from '../lib/http.js'
 import { requireRole } from '../middleware/auth.js'
 import { publicBrand, publicCreator } from '../services/serialize.js'

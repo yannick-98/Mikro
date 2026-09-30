@@ -11,13 +11,13 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)))
-const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm'
+const bin = (name) => path.join(root, 'node_modules', '.bin', process.platform === 'win32' ? `${name}.cmd` : name)
 
 const COLORS = { api: '\x1b[36m', web: '\x1b[35m', reset: '\x1b[0m', dim: '\x1b[2m' }
 
 const services = [
-  { name: 'api', cwd: path.join(root, 'backend'), args: ['run', 'dev'] },
-  { name: 'web', cwd: path.join(root, 'frontend'), args: ['run', 'dev'] },
+  { name: 'api', command: bin('nodemon'), args: ['backend/src/server.js'] },
+  { name: 'web', command: bin('vite'), args: ['--config', 'frontend/vite.config.js'] },
 ]
 
 const children = []
@@ -42,7 +42,10 @@ function shutdown(code = 0) {
 }
 
 for (const service of services) {
-  const child = spawn(npm, service.args, { cwd: service.cwd, shell: process.platform === 'win32' })
+  const child = spawn(service.command, service.args, {
+    cwd: root,
+    shell: process.platform === 'win32',
+  })
   children.push(child)
 
   child.stdout.on('data', (d) => console.log(prefix(service.name, d)))

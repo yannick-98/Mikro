@@ -1,4 +1,4 @@
-import prisma from '../lib/prisma.js'
+import { prisma } from '../lib/prisma.js'
 import { verifyToken } from '../lib/auth.js'
 import { forbidden, unauthorized } from '../lib/http.js'
 
