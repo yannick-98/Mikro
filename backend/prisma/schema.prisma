@@ -1,0 +1,270 @@
+// Mikro - esquema de datos
+// Marketplace que conecta pymes con micro-influencers.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Cuentas
+// ---------------------------------------------------------------------------
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  role         String // BRAND | CREATOR | ADMIN
+  name         String
+  avatarUrl    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  brand          Brand?
+  creator        Creator?
+  messages       Message[]
+  notifications  Notification[]
+  reviewsWritten Review[]       @relation("ReviewAuthor")
+}
+
+model Brand {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyName   String
+  sector        String
+  city          String
+  province      String?
+  website       String?
+  logoUrl       String?
+  description   String?
+  teamSize      String? // 1-5 | 6-20 | 21-50 | 50+
+  monthlyBudget Int? // euros
+  vatNumber     String?
+  verified      Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  campaigns     Campaign[]
+  savedCreators SavedCreator[]
+  deals         Deal[]
+}
+
+model Creator {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  handle        String   @unique
+  displayName   String
+  headline      String?
+  bio           String?
+  avatarUrl     String?
+  coverUrl      String?
+  category      String // Fitness | Moda | Gastronomia ...
+  subcategories String? // CSV
+  city          String
+  province      String?
+  country       String   @default("Espana")
+  languages     String   @default("Espanol") // CSV
+  verified      Boolean  @default(false)
+  featured      Boolean  @default(false)
+  available     Boolean  @default(true)
+
+  // Metricas agregadas: las recalcula services/score.js
+  totalFollowers Int   @default(0)
+  engagementRate Float @default(0)
+  score          Float @default(0)
+  rankPosition   Int   @default(0)
+  rankDelta      Int   @default(0) // movimiento respecto a la semana pasada
+  responseHours  Int   @default(24)
+  completedDeals Int   @default(0)
+  ratingAvg      Float @default(0)
+  ratingCount    Int   @default(0)
+
+  // Audiencia
+  audienceCountry   String @default("Espana")
+  audienceFemalePct Int    @default(50)
+  audienceAgeRange  String @default("25-34")
+
+  // Tarifas en euros
+  ratePost  Int @default(0)
+  rateReel  Int @default(0)
+  rateStory Int @default(0)
+  rateUgc   Int @default(0)
+
+  createdAt DateTime @default(now())
+
+  socialAccounts SocialAccount[]
+  portfolio      PortfolioItem[]
+  applications   Application[]
+  deals          Deal[]
+  savedBy        SavedCreator[]
+  reviews        Review[]        @relation("ReviewTarget")
+  rankHistory    RankSnapshot[]
+}
+
+model SocialAccount {
+  id         String  @id @default(cuid())
+  creatorId  String
+  creator    Creator @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  platform   String // instagram | tiktok | youtube
+  handle     String
+  url        String?
+  followers  Int     @default(0)
+  engagement Float   @default(0)
+  avgViews   Int     @default(0)
+
+  @@unique([creatorId, platform])
+}
+
+model PortfolioItem {
+  id        String  @id @default(cuid())
+  creatorId String
+  creator   Creator @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  imageUrl  String
+  caption   String?
+  platform  String?
+  likes     Int     @default(0)
+  position  Int     @default(0)
+}
+
+model RankSnapshot {
+  id        String   @id @default(cuid())
+  creatorId String
+  creator   Creator  @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  position  Int
+  score     Float
+  createdAt DateTime @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Campanas y colaboraciones
+// ---------------------------------------------------------------------------
+
+model Campaign {
+  id           String    @id @default(cuid())
+  brandId      String
+  brand        Brand     @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  title        String
+  brief        String
+  category     String
+  deliverables String // CSV: "1 reel, 3 stories"
+  budgetMin    Int
+  budgetMax    Int
+  targetCity   String?
+  minFollowers Int       @default(0)
+  maxFollowers Int       @default(1000000)
+  platforms    String    @default("instagram") // CSV
+  status       String    @default("OPEN") // DRAFT | OPEN | CLOSED | COMPLETED
+  startDate    DateTime?
+  endDate      DateTime?
+  productValue Int       @default(0)
+  createdAt    DateTime  @default(now())
+
+  applications Application[]
+  deals        Deal[]
+}
+
+model Application {
+  id          String   @id @default(cuid())
+  campaignId  String
+  campaign    Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  creatorId   String
+  creator     Creator  @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  message     String?
+  proposedFee Int
+  status      String   @default("PENDING") // PENDING | ACCEPTED | REJECTED | WITHDRAWN
+  source      String   @default("CREATOR") // CREATOR (se apunta) | BRAND (invitacion)
+  createdAt   DateTime @default(now())
+
+  @@unique([campaignId, creatorId])
+}
+
+model Deal {
+  id          String   @id @default(cuid())
+  campaignId  String
+  campaign    Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  brandId     String
+  brand       Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  creatorId   String
+  creator     Creator  @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  fee         Int
+  feePlatform Int      @default(0) // comision de Mikro
+  status      String   @default("ACCEPTED") // ACCEPTED | FUNDED | IN_PROGRESS | SUBMITTED | APPROVED | PAID | CANCELLED
+  contentUrl  String?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  messages Message[]
+  reviews  Review[]
+  payments Payment[]
+}
+
+model Payment {
+  id        String   @id @default(cuid())
+  dealId    String
+  deal      Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  amount    Int
+  fee       Int
+  kind      String // ESCROW_IN | PAYOUT | REFUND
+  status    String   @default("COMPLETED")
+  reference String?
+  createdAt DateTime @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Comunicacion y reputacion
+// ---------------------------------------------------------------------------
+
+model Message {
+  id        String    @id @default(cuid())
+  dealId    String
+  deal      Deal      @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  senderId  String
+  sender    User      @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  body      String
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  dealId    String
+  deal      Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User     @relation("ReviewAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  creatorId String
+  creator   Creator  @relation("ReviewTarget", fields: [creatorId], references: [id], onDelete: Cascade)
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+
+  @@unique([dealId, authorId])
+}
+
+model SavedCreator {
+  id        String   @id @default(cuid())
+  brandId   String
+  brand     Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  creatorId String
+  creator   Creator  @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([brandId, creatorId])
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind      String
+  title     String
+  body      String?
+  link      String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+}
