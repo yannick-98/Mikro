@@ -98,6 +98,24 @@
   }
 }
 
+/* La fila de creador decide segun SU ancho, no el del navegador: en un layout
+   de tres columnas el viewport no dice cuanto espacio queda de verdad. */
+.creator-row {
+  container-type: inline-size;
+}
+
+.creator-row-thumbs {
+  display: none;
+}
+
+/* 1070px es lo que mide la fila completa con el portfolio: por debajo, las
+   miniaturas se quedan fuera en vez de invadir la columna de al lado. */
+@container (min-width: 1070px) {
+  .creator-row-thumbs {
+    display: flex;
+  }
+}
+
 /* Oculta la barra de desplazamiento en carruseles horizontales */
 .no-scrollbar::-webkit-scrollbar {
   display: none;

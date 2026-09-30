@@ -194,7 +194,7 @@ export function Header({ transparent = false }) {
         transparent ? (scrolled ? 'bg-white/95 shadow-card backdrop-blur' : 'bg-transparent') : 'border-b border-black/[0.07] bg-white/95 backdrop-blur',
       )}
     >
-      <div className="mx-auto flex h-[68px] max-w-[1400px] items-center gap-6 px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto flex h-[68px] max-w-[1480px] items-center gap-6 px-4 sm:px-6 lg:px-8">
         <Logo tone={dark ? 'dark' : 'light'} />
 
         <nav className="hidden items-center gap-1 lg:flex">
@@ -338,7 +338,7 @@ export function Footer() {
 
   return (
     <footer className="mt-20 border-t border-black/[0.07] bg-white">
-      <div className="mx-auto max-w-[1400px] px-4 py-14 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-[1480px] px-4 py-14 sm:px-6 lg:px-8">
         <div className="grid gap-10 md:grid-cols-[1.4fr_repeat(3,1fr)]">
           <div>
             <Logo tone="light" />

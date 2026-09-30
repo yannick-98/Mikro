@@ -61,7 +61,7 @@ function Hero({ query, setQuery, onSearch, onAiSearch, inputRef, stats }) {
         />
       </div>
 
-      <div className="relative mx-auto max-w-[1400px] px-4 pb-10 pt-12 sm:px-6 lg:px-8 lg:pb-14 lg:pt-16">
+      <div className="relative mx-auto max-w-[1480px] px-4 pb-10 pt-12 sm:px-6 lg:px-8 lg:pb-14 lg:pt-16">
         <div className="grid items-start gap-10 lg:grid-cols-[1.25fr_0.75fr]">
           <div>
             <p className="text-[12px] font-bold uppercase tracking-[0.22em] text-white/45">El ranking de los creadores</p>
@@ -141,7 +141,7 @@ function CategoryStrip({ cards, selected, onSelect }) {
 
   return (
     <div className="relative -mt-8 pb-2">
-      <div className="mx-auto max-w-[1400px] px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-[1480px] px-4 sm:px-6 lg:px-8">
         <div className="relative rounded-2xl border border-black/[0.06] bg-white p-2 shadow-lift">
           <div ref={scroller} className="flex gap-1.5 overflow-x-auto scroll-smooth no-scrollbar">
             <button
@@ -477,8 +477,8 @@ export default function Discover() {
         }}
       />
 
-      <div className="mx-auto max-w-[1400px] px-4 py-8 sm:px-6 lg:px-8">
-        <div className="grid gap-6 lg:grid-cols-[248px_minmax(0,1fr)] xl:grid-cols-[248px_minmax(0,1fr)_268px]">
+      <div className="mx-auto max-w-[1480px] px-4 py-8 sm:px-6 lg:px-8 2xl:max-w-[1720px]">
+        <div className="grid gap-5 lg:grid-cols-[224px_minmax(0,1fr)] 2xl:grid-cols-[224px_minmax(0,1fr)_244px]">
           <Filters
             value={filters}
             onChange={(f) => {
@@ -673,7 +673,7 @@ export default function Discover() {
             ) : null}
           </div>
 
-          <div className="hidden space-y-4 xl:block">
+          <div className="hidden space-y-4 2xl:block">
             <MoversWidget />
             <BrandCta />
             <LiveStats stats={stats} />

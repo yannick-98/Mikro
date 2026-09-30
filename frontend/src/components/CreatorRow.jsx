@@ -53,12 +53,12 @@ function RankBadge({ position, featured }) {
  */
 export function CreatorRow({ creator, position, onToggleSave, saving = false, showSave = true }) {
   const rank = position ?? creator.listPosition ?? creator.rankPosition
-  const portfolio = (creator.portfolio || []).slice(0, 4)
+  const portfolio = (creator.portfolio || []).slice(0, 3)
 
   return (
     <article
       className={clsx(
-        'group relative flex flex-col gap-4 rounded-2xl border bg-white px-4 py-4 transition-all sm:px-5',
+        'creator-row group relative flex flex-col gap-4 overflow-hidden rounded-2xl border bg-white px-4 py-4 transition-all sm:px-5',
         creator.featured
           ? 'border-amber-200/80 bg-gradient-to-r from-amber-50/60 to-white'
           : 'border-black/[0.06]',
@@ -112,7 +112,7 @@ export function CreatorRow({ creator, position, onToggleSave, saving = false, sh
       </div>
 
       {portfolio.length ? (
-        <div className="hidden shrink-0 gap-1.5 2xl:flex">
+        <div className="creator-row-thumbs shrink-0 gap-1.5">
           {portfolio.map((p) => (
             <Thumb key={p.id} src={p.imageUrl} seed={p.id} className="h-[54px] w-[54px] rounded-lg" />
           ))}
