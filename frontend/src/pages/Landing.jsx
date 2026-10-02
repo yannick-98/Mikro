@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, Building2, UserRound } from 'lucide-react'
+import { ArrowRight, Building2, ChevronDown, UserRound } from 'lucide-react'
 import { api } from '../api/client'
 import { Logo } from '../components/ui'
 import PostCard from '../components/landing/PostCard'
@@ -16,8 +16,10 @@ import {
   lerp,
   orbitSlot,
   prefersStatic,
+  STOPS,
+  travelEase,
+  TRANSITION_MS,
   sceneMetrics,
-  snapTarget,
   toTransform,
 } from '../components/landing/scene'
 
@@ -100,7 +102,7 @@ function HeroCopy({ innerRef }) {
 
 function HeroCta({ innerRef }) {
   return (
-    <div ref={innerRef} className="absolute inset-x-0 bottom-[7vh] z-20 flex flex-col items-center gap-4 px-6">
+    <div ref={innerRef} className="absolute inset-x-0 bottom-[13vh] z-20 flex flex-col items-center gap-4 px-6">
       <div className="flex flex-wrap items-center justify-center gap-3">
         <Link
           to="/registro?rol=creador"
@@ -129,7 +131,6 @@ export default function Landing() {
   const [stats, setStats] = useState(null)
   const [isStatic, setIsStatic] = useState(() => prefersStatic())
 
-  const sceneRef = useRef(null)
   const cardRefs = useRef([])
   const slotRefs = useRef([])
   const heroCopyRef = useRef(null)
@@ -142,8 +143,20 @@ export default function Landing() {
   const auroraRef = useRef(null)
   const gridRef = useRef(null)
 
+  const [section, setSection] = useState(0)
+
   // Estado del bucle: nada de esto pasa por React, se escribe directo al DOM.
-  const loop = useRef({ p: 0, spin: 0, last: 0, paused: false, slots: [] })
+  const loop = useRef({
+    p: STOPS[0],
+    from: STOPS[0],
+    to: STOPS[0],
+    startedAt: 0,
+    moving: false,
+    spin: 0,
+    last: 0,
+    paused: false,
+    slots: [],
+  })
 
   useEffect(() => {
     let alive = true
@@ -160,16 +173,100 @@ export default function Landing() {
     }
   }, [])
 
-  // Una landing empieza por el principio: si el navegador restaura la posicion
-  // anterior, se entra a media transicion y no se entiende nada.
+  /**
+   * Navegacion por secciones.
+   *
+   * El gesto no arrastra la escena: solo dice hacia donde ir. La transicion se
+   * reproduce entera, siempre con la misma duracion, y mientras corre se
+   * ignoran los gestos nuevos. Es lo que evita quedarse entre dos secciones.
+   */
+  const goTo = useCallback(
+    (next) => {
+      const state = loop.current
+      const target = clamp(next, 0, STOPS.length - 1)
+      if (state.moving || target === state.index) return
+
+      state.index = target
+      state.from = state.p
+      state.to = STOPS[target]
+      state.startedAt = performance.now()
+      state.moving = true
+      setSection(target)
+    },
+    [],
+  )
+
   useEffect(() => {
-    const previous = window.history.scrollRestoration
-    if (previous) window.history.scrollRestoration = 'manual'
-    window.scrollTo(0, 0)
-    return () => {
-      if (previous) window.history.scrollRestoration = previous
+    if (isStatic) return undefined
+    loop.current.index = 0
+
+    // Sin scroll nativo: la pagina no se desplaza, se transforma.
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+
+    let wheelSum = 0
+    let wheelAt = 0
+    let touchY = 0
+
+    const step = (dir) => goTo((loop.current.index ?? 0) + dir)
+
+    const onWheel = (e) => {
+      e.preventDefault()
+      if (loop.current.moving) return
+
+      // Un trackpad manda decenas de eventos por gesto: se acumulan y solo se
+      // dispara al superar un umbral, reiniciando si hay una pausa.
+      const now = performance.now()
+      if (now - wheelAt > 180) wheelSum = 0
+      wheelAt = now
+      wheelSum += e.deltaY
+
+      if (Math.abs(wheelSum) > 45) {
+        step(wheelSum > 0 ? 1 : -1)
+        wheelSum = 0
+      }
     }
-  }, [])
+
+    const onTouchStart = (e) => {
+      touchY = e.touches[0].clientY
+    }
+    const onTouchMove = (e) => {
+      e.preventDefault()
+      if (loop.current.moving) return
+      const delta = touchY - e.touches[0].clientY
+      if (Math.abs(delta) > 55) {
+        step(delta > 0 ? 1 : -1)
+        touchY = e.touches[0].clientY
+      }
+    }
+
+    const onKey = (e) => {
+      const next = { ArrowDown: 1, PageDown: 1, ' ': 1, ArrowUp: -1, PageUp: -1 }[e.key]
+      if (next) {
+        e.preventDefault()
+        step(next)
+      } else if (e.key === 'Home') {
+        e.preventDefault()
+        goTo(0)
+      } else if (e.key === 'End') {
+        e.preventDefault()
+        goTo(STOPS.length - 1)
+      }
+    }
+
+    window.addEventListener('wheel', onWheel, { passive: false })
+    window.addEventListener('touchstart', onTouchStart, { passive: true })
+    window.addEventListener('touchmove', onTouchMove, { passive: false })
+    window.addEventListener('keydown', onKey)
+
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener('wheel', onWheel)
+      window.removeEventListener('touchstart', onTouchStart)
+      window.removeEventListener('touchmove', onTouchMove)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [isStatic, goTo])
 
   useEffect(() => {
     const onResize = () => setIsStatic(prefersStatic())
@@ -227,11 +324,14 @@ export default function Landing() {
       state.last = time
       state.clock = (state.clock || 0) + dt / 1000
 
-      const scene = sceneRef.current
-      if (scene) {
-        const rect = scene.getBoundingClientRect()
-        const total = rect.height - window.innerHeight
-        state.p = clamp(total > 0 ? -rect.top / total : 0)
+      // La posicion de la escena la marca la transicion en curso, no el scroll.
+      if (state.moving) {
+        const t = clamp((time - state.startedAt) / TRANSITION_MS)
+        state.p = lerp(state.from, state.to, travelEase(t))
+        if (t >= 1) {
+          state.p = state.to
+          state.moving = false
+        }
       }
 
       const { radius, card } = metrics()
@@ -311,50 +411,6 @@ export default function Landing() {
     return () => cancelAnimationFrame(raf)
   }, [isStatic, creators])
 
-  /**
-   * Si el scroll se detiene en mitad de una transicion, la escena se lleva
-   * sola al estado estable mas cercano. Quedarse entre dos secciones no es un
-   * sitio donde haya nada que leer.
-   */
-  useEffect(() => {
-    if (isStatic) return undefined
-
-    let timer
-    let settling = false
-
-    const settle = () => {
-      const scene = sceneRef.current
-      if (!scene || settling) return
-
-      const rect = scene.getBoundingClientRect()
-      const total = rect.height - window.innerHeight
-      if (total <= 0) return
-
-      const p = clamp(-rect.top / total)
-      const target = snapTarget(p)
-      if (target === null) return
-
-      settling = true
-      window.scrollTo({ top: scene.offsetTop + total * target, behavior: 'smooth' })
-      // Si el usuario vuelve a mover la rueda, el navegador cancela el
-      // desplazamiento solo; el margen evita encadenar dos seguidos.
-      setTimeout(() => {
-        settling = false
-      }, 900)
-    }
-
-    const onScroll = () => {
-      clearTimeout(timer)
-      timer = setTimeout(settle, 160)
-    }
-
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => {
-      window.removeEventListener('scroll', onScroll)
-      clearTimeout(timer)
-    }
-  }, [isStatic])
-
   const pause = () => (loop.current.paused = true)
   const resume = () => (loop.current.paused = false)
 
@@ -410,12 +466,14 @@ export default function Landing() {
   // -------------------------------------------------------------------------
   // Escena completa
   // -------------------------------------------------------------------------
+  const LABELS = ['Creadores', 'Ranking', 'Empresas']
+
   return (
-    <div className="relative bg-ink">
+    <div className="relative h-screen overflow-hidden bg-ink">
       <Header />
 
-      <div ref={sceneRef} className="relative h-[340vh]">
-        <div className="sticky top-0 h-screen overflow-hidden">
+      <div className="relative h-full">
+        <div className="relative h-full overflow-hidden">
           <Backdrop auroraRef={auroraRef} gridRef={gridRef} />
 
           <HeroCopy innerRef={heroCopyRef} />
@@ -472,10 +530,49 @@ export default function Landing() {
         </div>
       </div>
 
-      <footer className="relative z-10 border-t border-white/10 bg-ink px-6 py-10 text-center">
-        <p className="text-[13px] text-white/35">
-          © {new Date().getFullYear()} Mikro · Proyecto de demostración ·{' '}
-          <Link to="/recursos" className="font-semibold text-white/55 hover:text-white">
+      {/* Indicador de seccion: sin barra de scroll hay que decir de alguna
+          manera que esto tiene tres paradas, y permitir saltar a cualquiera. */}
+      <nav aria-label="Secciones" className="fixed right-6 top-1/2 z-40 hidden -translate-y-1/2 flex-col items-end gap-3 lg:flex">
+        {LABELS.map((label, i) => (
+          <button
+            key={label}
+            type="button"
+            onClick={() => goTo(i)}
+            aria-current={section === i ? 'true' : undefined}
+            className="group flex items-center gap-2.5"
+          >
+            <span
+              className={`text-[11px] font-bold uppercase tracking-wider transition ${
+                section === i ? 'text-white/70' : 'text-white/0 group-hover:text-white/40'
+              }`}
+            >
+              {label}
+            </span>
+            <span
+              className={`block rounded-full transition-all duration-500 ${
+                section === i ? 'h-6 w-1.5 bg-white' : 'h-1.5 w-1.5 bg-white/30 group-hover:bg-white/60'
+              }`}
+            />
+          </button>
+        ))}
+      </nav>
+
+      {/* Pista de avance: solo mientras no se haya movido nadie. */}
+      <button
+        type="button"
+        onClick={() => goTo(section + 1)}
+        className={`fixed inset-x-0 bottom-5 z-40 mx-auto flex w-fit flex-col items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.2em] text-white/35 transition-opacity duration-500 ${
+          section === 0 ? 'opacity-100' : 'pointer-events-none opacity-0'
+        }`}
+      >
+        Desliza
+        <ChevronDown size={15} className="landing-hint" />
+      </button>
+
+      <footer className="pointer-events-none fixed inset-x-0 bottom-4 z-30 px-6">
+        <p className="pointer-events-auto text-left text-[11.5px] text-white/20">
+          © {new Date().getFullYear()} Mikro ·{' '}
+          <Link to="/recursos" className="hover:text-white/50">
             Recursos
           </Link>
         </p>

@@ -109,9 +109,14 @@ El tramo más delicado. La órbita no desaparece: **se recoge**.
                                                       05 ──────
 ```
 
-**Cómo funciona.** La escena es un bloque de `320vh` con una capa `sticky` que ocupa la
-pantalla. Un hook calcula el progreso `p ∈ [0,1]` del scroll dentro de ese bloque y, en
-cada fotograma, cada tarjeta recibe un `transform` que es la **mezcla** de dos estados:
+**Cómo funciona.** La animación **no sigue al scroll**: el gesto solo decide a qué
+sección se va, y la transición se reproduce entera con su propio tiempo (1,5 s). Así
+nunca se queda a medias ni depende de cuánto haya girado la rueda. La página no se
+desplaza —no hay scroll nativo—, se transforma.
+
+La posición de la escena es un número `p ∈ [0,1]` con tres paradas (0,06 · 0,63 · 0,99)
+que se interpola entre ellas. En cada fotograma, cada tarjeta recibe un `transform` que
+es la **mezcla** de dos estados:
 
 - **Estado órbita:** su posición en el cilindro (ángulo, radio, escala).
 - **Estado destino:** su hueco en el podio o en la lista, en píxeles.
@@ -125,7 +130,7 @@ vez, que es lo que produce la sensación de absorción.
 convierten en las filas de la lista; las dos sobrantes se encogen hacia el centro y se
 desvanecen, como si el ranking se las hubiera tragado.
 
-**Tramos de scroll:**
+**Tramos del recorrido** (en `p`, no en scroll):
 
 | p | Qué ocurre |
 |---|---|
@@ -269,6 +274,12 @@ pantallas pequeñas, molesta.
 | 768 – 1279 px | Igual, con radio de órbita de 300 px y podio compacto. |
 | < 768 px | **Sin escena 3D.** Tres secciones apiladas: carrusel horizontal con `scroll-snap`, ranking estático y bloque de empresas. Misma información, sin secuestro del scroll. |
 | `prefers-reduced-motion` | Lo mismo que en móvil, en cualquier tamaño. No es una degradación: es la versión correcta para quien la pide. |
+
+**Gestos que avanzan de sección:** rueda del ratón y trackpad (con acumulador y umbral,
+porque un trackpad manda decenas de eventos por gesto), deslizamiento vertical, y
+teclado: flechas, `AvPág`/`RePág`, espacio, `Inicio` y `Fin`. Mientras una transición
+corre se ignoran los gestos nuevos. A la derecha hay tres indicadores que marcan dónde
+se está y permiten saltar a cualquier sección.
 
 Además:
 

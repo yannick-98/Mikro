@@ -16,24 +16,30 @@ export const PHASES = {
 }
 
 /**
- * Puntos de reposo y zonas muertas.
+ * Las tres secciones, expresadas como posiciones de la escena.
  *
- * Entre dos secciones no hay nada que mirar: la pieza esta a medio recoger o
- * el panel de canto. Si el usuario suelta el scroll ahi, la escena se lleva
- * sola al estado estable mas cercano en vez de quedarse a medias.
+ * La animacion no sigue al scroll: el gesto solo decide a que seccion se va, y
+ * la transicion se reproduce entera con su propio tiempo. Asi nunca se queda a
+ * medias ni depende de cuanto haya girado la rueda.
  */
-export const RESTS = { hero: 0.06, rank: 0.63, brands: 0.99 }
-export const DEAD_ZONES = [
-  [0.2, 0.58, RESTS.hero, RESTS.rank],
-  [0.71, 0.96, RESTS.rank, RESTS.brands],
-]
+export const STOPS = [0.06, 0.63, 0.99]
 
-/** Destino al que llevar la escena, o null si ya esta en reposo. */
-export function snapTarget(p) {
-  for (const [from, to, before, after] of DEAD_ZONES) {
-    if (p > from && p < to) return p < (from + to) / 2 ? before : after
-  }
-  return null
+/** Cuanto dura cada transicion, en milisegundos. */
+export const TRANSITION_MS = 1500
+
+/**
+ * Curva del viaje entre secciones.
+ *
+ * No es un easeInOut normal: la parte central del recorrido es donde ocurre lo
+ * que hay que ver (la orbita recogiendose, el panel de canto), asi que la
+ * curva afloja ahi en vez de pasar de largo a toda velocidad.
+ */
+export function travelEase(t) {
+  const base = t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2
+  const linear = t
+  // Mezcla con el avance lineal: conserva la entrada y la salida suaves, pero
+  // reparte mejor el tiempo por el medio.
+  return base * 0.45 + linear * 0.55
 }
 
 export const clamp = (v, min = 0, max = 1) => Math.max(min, Math.min(max, v))

@@ -152,6 +152,15 @@
   50% { transform: translate3d(-7%, -5%, 0) scale(0.95); }
 }
 
+/* La flecha de "desliza" respira para que se vea que invita a algo. */
+.landing-hint {
+  animation: landing-hint 2.4s ease-in-out infinite;
+}
+@keyframes landing-hint {
+  0%, 100% { transform: translateY(0); opacity: 0.6; }
+  50% { transform: translateY(4px); opacity: 1; }
+}
+
 /* El titulo con un leve brillo propio, sin llegar a neon. */
 .landing-title {
   text-shadow: 0 0 80px rgba(96, 150, 250, 0.35);
