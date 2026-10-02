@@ -37,7 +37,7 @@ export default function PostCard({ creator, live = false, hours = 2, className, 
       ref={innerRef}
       style={style}
       className={clsx(
-        'landing-card group absolute left-1/2 top-1/2 flex flex-col overflow-hidden rounded-[22px] border border-white/12 bg-ink text-white shadow-[0_24px_60px_-20px_rgba(0,0,0,0.85)]',
+        'landing-card group absolute left-1/2 top-1/2 flex flex-col overflow-hidden rounded-[22px] bg-ink text-white shadow-[0_18px_50px_-18px_rgba(0,0,0,0.9)]',
         className,
       )}
     >

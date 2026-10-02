@@ -57,10 +57,15 @@ export const lerp = (a, b, t) => a + (b - a) * t
  * mas escala y opacidad, de modo que la mirada va sola al centro sin tener que
  * oscurecer las demas.
  */
-export function orbitSlot(index, total, spinDeg, radius) {
+export function orbitSlot(index, total, spinDeg, radius, time = 0) {
   const step = 360 / total
   const angle = (index * step + spinDeg) % 360
   const rad = (angle * Math.PI) / 180
+
+  // Cada tarjeta flota con su propia fase: un carrusel perfectamente rigido se
+  // percibe como un mecanismo, no como algo vivo.
+  const bob = Math.sin(time * 0.6 + index * 1.7) * 9 + Math.sin(time * 0.37 + index) * 4
+  const tilt = Math.sin(time * 0.45 + index * 2.1) * 1.4
 
   // -1 detras del todo, 1 justo delante.
   const front = Math.cos(rad - Math.PI / 2)
@@ -68,7 +73,8 @@ export function orbitSlot(index, total, spinDeg, radius) {
 
   return {
     x: Math.cos(rad - Math.PI / 2) * 0, // el desplazamiento lo da el propio rotateY
-    y: 0,
+    y: bob,
+    tilt,
     z: 0,
     angle,
     radius,
@@ -108,9 +114,10 @@ export function blendTransform(slot, target, cardSize, t, delay = 0) {
   // absorcion, mas que el propio desplazamiento.
   const shrink = 1 - eased
   const x = lerp(orbitX * shrink, target ? target.x : 0, eased)
-  const y = lerp(0, target ? target.y : 0, eased)
+  const y = lerp(slot.y, target ? target.y : 0, eased)
   const z = lerp(orbitZ * shrink, 0, eased)
   const rotateY = lerp(orbitRotY, 0, Math.min(1, eased * 1.4))
+  const rotateZ = lerp(slot.tilt || 0, 0, eased)
 
   // Al llegar, la tarjeta mide lo que su hueco. Manda la altura: una fila del
   // ranking es ancha y baja, y escalar por el ancho dejaria la tarjeta enorme.
@@ -124,12 +131,12 @@ export function blendTransform(slot, target, cardSize, t, delay = 0) {
   const fade = staggered > 0.5 ? 1 - between(staggered, [0.5, 0.88]) : 1
   const opacity = lerp(slot.opacity, 1, eased) * fade
 
-  return { x, y, z, rotateY, scale, opacity }
+  return { x, y, z, rotateY, rotateZ, scale, opacity }
 }
 
 /** Convierte un estado en la cadena de transform, en el orden correcto. */
-export function toTransform({ x, y, z, rotateY, scale }) {
-  return `translate3d(${x.toFixed(2)}px, ${y.toFixed(2)}px, ${z.toFixed(2)}px) rotateY(${rotateY.toFixed(2)}deg) scale(${scale.toFixed(3)})`
+export function toTransform({ x, y, z, rotateY, rotateZ = 0, scale }) {
+  return `translate3d(${x.toFixed(2)}px, ${y.toFixed(2)}px, ${z.toFixed(2)}px) rotateY(${rotateY.toFixed(2)}deg) rotateZ(${rotateZ.toFixed(2)}deg) scale(${scale.toFixed(3)})`
 }
 
 /** Tamano de la escena segun el ancho disponible. */

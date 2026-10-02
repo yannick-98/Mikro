@@ -6,9 +6,9 @@ import { formatPercent } from '../../lib/format'
 
 /** Oro, plata y bronce: el anillo del avatar y el numero del bloque. */
 const METALS = {
-  1: { ring: 'ring-amber-300/80', glow: 'shadow-[0_0_60px_-12px_rgba(251,191,36,0.55)]', num: 'text-amber-300', bar: 'from-amber-300/25 to-transparent' },
-  2: { ring: 'ring-slate-200/70', glow: '', num: 'text-slate-200', bar: 'from-slate-200/18 to-transparent' },
-  3: { ring: 'ring-orange-300/70', glow: '', num: 'text-orange-300', bar: 'from-orange-300/18 to-transparent' },
+  1: { ring: 'ring-amber-400/45', glow: '', num: 'text-amber-300', bar: 'from-amber-300/18 to-transparent' },
+  2: { ring: 'ring-slate-400/35', glow: '', num: 'text-slate-200', bar: 'from-slate-300/10 to-transparent' },
+  3: { ring: 'ring-orange-400/35', glow: '', num: 'text-orange-300', bar: 'from-orange-400/10 to-transparent' },
 }
 
 function Delta({ value }) {
@@ -23,7 +23,7 @@ function Delta({ value }) {
 
 function PodiumStep({ creator, place, slotRef }) {
   const metal = METALS[place]
-  const height = place === 1 ? 'h-[96px]' : place === 2 ? 'h-[76px]' : 'h-[62px]'
+  const height = place === 1 ? 'h-[104px]' : place === 2 ? 'h-[90px]' : 'h-[80px]'
 
   return (
     <div className={clsx('flex flex-col items-center', place === 1 ? 'order-2' : place === 2 ? 'order-1' : 'order-3')}>
@@ -33,7 +33,7 @@ function PodiumStep({ creator, place, slotRef }) {
           src={creator?.avatarUrl}
           name={creator?.displayName || '—'}
           size={place === 1 ? 62 : 52}
-          className={clsx('ring-[3px]', metal.ring, metal.glow)}
+          className={clsx('ring-2', metal.ring, metal.glow)}
         />
         <span className={clsx('absolute -bottom-1 left-1/2 flex h-6 w-6 -translate-x-1/2 items-center justify-center rounded-full border-2 border-ink bg-ink text-[11px] font-black', metal.num)}>
           {place}
@@ -49,13 +49,13 @@ function PodiumStep({ creator, place, slotRef }) {
       <div
         ref={slotRef}
         className={clsx(
-          'mt-2.5 flex w-[120px] flex-col items-center justify-end rounded-2xl border border-white/10 bg-gradient-to-b pb-2.5 pt-3',
+          'mt-2.5 flex w-[120px] flex-col items-center justify-center gap-0.5 rounded-2xl border border-white/[0.07] bg-gradient-to-b px-2 py-2.5',
           height,
           metal.bar,
         )}
       >
-        <span className={clsx('text-[27px] font-black leading-none', metal.num)}>{place}</span>
-        <span className="mt-1.5 text-[15px] font-black text-white">
+        <span className={clsx('text-[24px] font-black leading-none', metal.num)}>{place}</span>
+        <span className="text-[14px] font-black leading-none text-white">
           {Math.round(creator?.score || 0)}
           <span className="ml-1 text-[11px] font-bold text-white/40">pts</span>
         </span>

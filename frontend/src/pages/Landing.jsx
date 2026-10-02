@@ -219,8 +219,13 @@ export default function Landing() {
 
     const frame = (time) => {
       const state = loop.current
-      const dt = state.last ? Math.min(64, time - state.last) : 16
+      const raw = state.last ? Math.min(64, time - state.last) : 16
+      // Media movil del tiempo entre fotogramas: un frame largo daba un salto
+      // en la rotacion, que es lo que se percibia como movimiento brusco.
+      state.dt = state.dt ? state.dt * 0.82 + raw * 0.18 : raw
+      const dt = state.dt
       state.last = time
+      state.clock = (state.clock || 0) + dt / 1000
 
       const scene = sceneRef.current
       if (scene) {
@@ -234,13 +239,14 @@ export default function Landing() {
 
       // La orbita solo gira mientras esta desplegada.
       if (!state.paused && absorb < 0.98) {
-        state.spin = (state.spin + (dt / 1000) * (360 / SPIN_SECONDS) * (1 - absorb)) % 360
+        const breathe = 1 + Math.sin(state.clock * 0.22) * 0.18
+        state.spin = (state.spin + (dt / 1000) * (360 / SPIN_SECONDS) * breathe * (1 - absorb)) % 360
       }
 
       const n = cardRefs.current.length
       cardRefs.current.forEach((el, i) => {
         if (!el) return
-        const slot = orbitSlot(i, n, state.spin, radius)
+        const slot = orbitSlot(i, n, state.spin, radius, state.clock)
         const target = state.slots[i]
         // Las de delante se van primero: la succion recorre el circulo.
         const t = blendTransform(slot, target, card, absorb, (i / n) * 0.18)
