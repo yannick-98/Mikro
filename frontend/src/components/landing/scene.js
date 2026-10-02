@@ -24,8 +24,20 @@ export const PHASES = {
  */
 export const STOPS = [0.06, 0.63, 0.99]
 
-/** Cuanto dura cada transicion, en milisegundos. */
+/** Duracion por defecto de una transicion, en milisegundos. */
 export const TRANSITION_MS = 1500
+
+/**
+ * Cuanto dura cada tramo.
+ *
+ * Ir de la orbita al ranking es el viaje largo: hay que ver como se recogen
+ * diez tarjetas y como se monta el podio. El giro del panel, en cambio, se
+ * entiende antes y alargarlo solo lo haria pesado.
+ */
+export function durationFor(from, to) {
+  const tocaPrimerTramo = Math.min(from, to) === 0
+  return tocaPrimerTramo ? 2000 : TRANSITION_MS
+}
 
 /**
  * Curva del viaje entre secciones.

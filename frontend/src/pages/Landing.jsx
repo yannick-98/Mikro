@@ -19,6 +19,7 @@ import {
   STOPS,
   travelEase,
   TRANSITION_MS,
+  durationFor,
   sceneMetrics,
   toTransform,
 } from '../components/landing/scene'
@@ -186,10 +187,12 @@ export default function Landing() {
       const target = clamp(next, 0, STOPS.length - 1)
       if (state.moving || target === state.index) return
 
+      state.indexBefore = state.index ?? 0
       state.index = target
       state.from = state.p
       state.to = STOPS[target]
       state.startedAt = performance.now()
+      state.duration = durationFor(state.indexBefore, target)
       state.moving = true
       setSection(target)
     },
@@ -326,7 +329,7 @@ export default function Landing() {
 
       // La posicion de la escena la marca la transicion en curso, no el scroll.
       if (state.moving) {
-        const t = clamp((time - state.startedAt) / TRANSITION_MS)
+        const t = clamp((time - state.startedAt) / (state.duration || TRANSITION_MS))
         state.p = lerp(state.from, state.to, travelEase(t))
         if (t >= 1) {
           state.p = state.to
@@ -484,8 +487,6 @@ export default function Landing() {
             ref={orbitRef}
             className="absolute inset-0 z-10"
             style={{ perspective: '1500px' }}
-            onMouseEnter={pause}
-            onMouseLeave={resume}
             onFocusCapture={pause}
             onBlurCapture={resume}
           >
