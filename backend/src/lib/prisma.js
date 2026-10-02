@@ -28,8 +28,15 @@ resolveDatabaseUrls()
 function connectionUrl() {
   const url = process.env.DATABASE_URL
   if (!url) return undefined
-  if (!process.env.NETLIFY && !process.env.AWS_LAMBDA_FUNCTION_NAME) return url
-  return url.includes('connection_limit=') ? url : `${url}${url.includes('?') ? '&' : '?'}connection_limit=1`
+  const extra = []
+  // Un pooler en modo transaccion no conserva los prepared statements que
+  // Prisma crea por defecto: sin este parametro, las consultas fallan.
+  if (/pooler\.|pgbouncer/.test(url) && !url.includes('pgbouncer=')) extra.push('pgbouncer=true')
+  if ((process.env.NETLIFY || process.env.AWS_LAMBDA_FUNCTION_NAME) && !url.includes('connection_limit=')) {
+    extra.push('connection_limit=1')
+  }
+  if (!extra.length) return url
+  return `${url}${url.includes('?') ? '&' : '?'}${extra.join('&')}`
 }
 
 function createClient() {

@@ -11,7 +11,11 @@ import 'dotenv/config'
 import { PrismaClient } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 
-const prisma = new PrismaClient()
+// El seed hace miles de escrituras seguidas: el pooler en modo transaccion no
+// mantiene la sesion y corta a mitad, asi que se usa la conexion directa.
+const seedUrl = process.env.DIRECT_DATABASE_URL || process.env.DATABASE_URL
+
+const prisma = new PrismaClient(seedUrl ? { datasources: { db: { url: seedUrl } } } : {})
 
 /**
  * El seed borra TODO antes de sembrar. Contra una base remota eso destruiria
