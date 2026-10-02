@@ -1,13 +1,12 @@
 import { useEffect } from 'react'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
-import { useAuth } from './store/auth'
+import { homeFor, useAuth } from './store/auth'
 import { Spinner } from './components/ui'
 
+import Landing from './pages/Landing'
 import Discover from './pages/Discover'
 import Rankings from './pages/Rankings'
 import CreatorProfile from './pages/CreatorProfile'
-import ForBusiness from './pages/ForBusiness'
-import ForCreators from './pages/ForCreators'
 import Resources from './pages/Resources'
 import Login from './pages/Login'
 import Register from './pages/Register'
@@ -37,6 +36,24 @@ function ScrollToTop() {
   return null
 }
 
+/**
+ * La raiz: landing para quien no tiene cuenta, su sitio de trabajo para quien
+ * si la tiene. Nadie aterriza en una pagina de captacion estando dentro.
+ */
+function Entrada() {
+  const { user, loading } = useAuth()
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-ink">
+        <Spinner size={28} className="text-brand-500" />
+      </div>
+    )
+  }
+  if (user) return <Navigate to={homeFor(user)} replace />
+  return <Landing />
+}
+
 function Protected({ roles, children }) {
   const { user, loading } = useAuth()
   const location = useLocation()
@@ -58,15 +75,21 @@ export default function App() {
     <>
       <ScrollToTop />
       <Routes>
-        {/* Publico */}
-        <Route path="/" element={<Discover />} />
+        {/* Publico: la puerta de entrada y poco mas. El ranking se ve, pero
+            recortado a los diez primeros; el resto es la aplicacion. */}
+        <Route path="/" element={<Entrada />} />
         <Route path="/rankings" element={<Rankings />} />
-        <Route path="/creador/:handle" element={<CreatorProfile />} />
-        <Route path="/para-empresas" element={<ForBusiness />} />
-        <Route path="/para-creadores" element={<ForCreators />} />
         <Route path="/recursos" element={<Resources />} />
         <Route path="/entrar" element={<Login />} />
         <Route path="/registro" element={<Register />} />
+
+        {/* Las antiguas paginas de captacion viven ahora en la landing. */}
+        <Route path="/para-empresas" element={<Navigate to="/" replace />} />
+        <Route path="/para-creadores" element={<Navigate to="/" replace />} />
+
+        {/* Interior */}
+        <Route path="/descubrir" element={<Protected><Discover /></Protected>} />
+        <Route path="/creador/:handle" element={<Protected><CreatorProfile /></Protected>} />
 
         {/* Empresa */}
         <Route path="/empresa" element={<Protected roles={['BRAND']}><BrandDashboard /></Protected>} />

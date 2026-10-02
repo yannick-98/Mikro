@@ -145,7 +145,7 @@ export default function CreatorProfile() {
             title="Creador no encontrado"
             description="Puede que haya cambiado su nombre de usuario o que ya no este disponible."
             action={
-              <Link to="/" className="btn-dark">
+              <Link to="/descubrir" className="btn-dark">
                 Volver a Descubrir
               </Link>
             }

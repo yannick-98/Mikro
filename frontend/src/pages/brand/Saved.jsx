@@ -26,7 +26,7 @@ export default function BrandSaved() {
       subtitle="Tu lista corta para las proximas campanas."
       nav={BRAND_NAV}
       actions={
-        <Link to="/" className="btn-ghost">
+        <Link to="/descubrir" className="btn-ghost">
           Buscar mas creadores
         </Link>
       }
@@ -41,7 +41,7 @@ export default function BrandSaved() {
           title="Todavia no has guardado a nadie"
           description="Pulsa el marcador en cualquier creador del buscador para tenerlo aqui cuando prepares una campana."
           action={
-            <Link to="/" className="btn-dark">
+            <Link to="/descubrir" className="btn-dark">
               Ir a Descubrir
             </Link>
           }

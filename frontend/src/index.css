@@ -116,6 +116,77 @@
   }
 }
 
+/* --------------------------------------------------------------------------
+   Landing: la escena de tres estados
+   -------------------------------------------------------------------------- */
+
+/* Aurora de fondo: tres luces muy lentas para que nunca este del todo quieto. */
+.landing-aurora {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(90px);
+  will-change: transform;
+}
+.landing-aurora-1 {
+  inset: -20% 30% 40% -10%;
+  background: radial-gradient(circle, rgba(37, 99, 235, 0.5), transparent 68%);
+  animation: landing-drift-a 44s ease-in-out infinite;
+}
+.landing-aurora-2 {
+  inset: 10% -15% -25% 35%;
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.42), transparent 68%);
+  animation: landing-drift-b 52s ease-in-out infinite;
+}
+.landing-aurora-3 {
+  inset: 45% 20% -30% 10%;
+  background: radial-gradient(circle, rgba(34, 211, 238, 0.26), transparent 70%);
+  animation: landing-drift-a 60s ease-in-out infinite reverse;
+}
+
+@keyframes landing-drift-a {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(6%, 4%, 0) scale(1.12); }
+}
+@keyframes landing-drift-b {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1.05); }
+  50% { transform: translate3d(-7%, -5%, 0) scale(0.95); }
+}
+
+/* El titulo con un leve brillo propio, sin llegar a neon. */
+.landing-title {
+  text-shadow: 0 0 80px rgba(96, 150, 250, 0.35);
+}
+
+/* Las tarjetas del carrusel las posiciona el bucle de animacion. */
+.landing-card {
+  transform-style: preserve-3d;
+  backface-visibility: hidden;
+  will-change: transform, opacity;
+}
+
+/* El panel que se da la vuelta. */
+.landing-panel {
+  transform-style: preserve-3d;
+  will-change: transform, opacity;
+}
+.landing-face {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backface-visibility: hidden;
+  padding: 8px;
+}
+.landing-face-back {
+  transform: rotateY(180deg);
+}
+
+/* La cara frontal manda en el alto del panel; la trasera se superpone. */
+.landing-panel > .landing-face:first-child {
+  position: relative;
+}
+
 /* Oculta la barra de desplazamiento en carruseles horizontales */
 .no-scrollbar::-webkit-scrollbar {
   display: none;

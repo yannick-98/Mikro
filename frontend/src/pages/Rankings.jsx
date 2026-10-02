@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import clsx from 'clsx'
 import { MapPin, Trophy } from 'lucide-react'
 import { api } from '../api/client'
+import { useAuth } from '../store/auth'
 import Layout from '../components/Layout'
 import { CreatorRow, CreatorRowSkeleton, CreatorMini } from '../components/CreatorRow'
 import { Delta, PlatformIcon, useAsync } from '../components/ui'
@@ -16,6 +17,9 @@ const SCOPES = [
 ]
 
 export default function Rankings() {
+  // Sin cuenta el ranking es un escaparate: los diez primeros del global. Los
+  // cortes por categoria, ciudad o plataforma son herramienta de trabajo.
+  const { user } = useAuth()
   const [scope, setScope] = useState('global')
   const [value, setValue] = useState(null)
 
@@ -51,20 +55,22 @@ export default function Rankings() {
       </section>
 
       <div className="mx-auto max-w-[1180px] px-4 py-8 sm:px-6 lg:px-8">
-        <div className="flex flex-wrap items-center gap-2">
-          {SCOPES.map((s) => (
-            <button
-              key={s.id}
-              type="button"
-              onClick={() => changeScope(s.id)}
-              className={clsx('chip !px-4 !py-2 !text-[13px] !font-bold', scope === s.id && 'chip-active')}
-            >
-              {s.label}
-            </button>
-          ))}
-        </div>
+        {user ? (
+          <div className="flex flex-wrap items-center gap-2">
+            {SCOPES.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => changeScope(s.id)}
+                className={clsx('chip !px-4 !py-2 !text-[13px] !font-bold', scope === s.id && 'chip-active')}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+        ) : null}
 
-        {options ? (
+        {user && options ? (
           <div className="mt-4 flex flex-wrap gap-1.5">
             {options.map((o) => (
               <button

@@ -8,10 +8,8 @@ import { Avatar, Logo } from './ui'
 import { formatRelative } from '../lib/format'
 
 const NAV = [
-  { to: '/', label: 'Descubrir', end: true },
+  { to: '/descubrir', label: 'Descubrir' },
   { to: '/rankings', label: 'Rankings' },
-  { to: '/para-empresas', label: 'Para empresas' },
-  { to: '/para-creadores', label: 'Para creadores' },
   { to: '/recursos', label: 'Recursos' },
 ]
 
@@ -224,7 +222,7 @@ export function Header({ transparent = false }) {
         <div className="ml-auto flex items-center gap-2">
           <button
             type="button"
-            onClick={() => navigate('/?focus=1')}
+            onClick={() => navigate('/descubrir?focus=1')}
             className={clsx(
               'hidden rounded-xl p-2 transition sm:block',
               dark ? 'text-white/70 hover:bg-white/10 hover:text-white' : 'text-ink/50 hover:bg-black/5 hover:text-ink',
@@ -310,10 +308,9 @@ export function Footer() {
     {
       title: 'Producto',
       links: [
-        { to: '/', label: 'Descubrir creadores' },
+        { to: '/descubrir', label: 'Descubrir creadores' },
         { to: '/rankings', label: 'Rankings' },
-        { to: '/para-empresas', label: 'Para empresas' },
-        { to: '/para-creadores', label: 'Para creadores' },
+        { to: '/recursos', label: 'Guias y plantillas' },
       ],
     },
     {

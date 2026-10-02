@@ -8,15 +8,24 @@ const router = Router()
 
 const INCLUDE = { socialAccounts: true, portfolio: { orderBy: { position: 'asc' }, take: 4 } }
 
+// Sin sesion el ranking es un escaparate: los diez primeros del global y nada
+// mas. Los cortes por categoria, ciudad o plataforma son la herramienta de
+// trabajo, y esa vive dentro de la aplicacion.
+const PUBLIC_LIMIT = 10
+
 /**
- * Ranking publico. scope: global | category | city | platform
+ * Ranking. scope: global | category | city | platform
  * El periodo afecta al movimiento mostrado, no al orden (el score es acumulado).
  */
 router.get(
   '/',
   asyncHandler(async (req, res) => {
-    const { scope = 'global', value, limit = 20 } = req.query
-    const take = Math.min(100, Number(limit) || 20)
+    const anonymous = !req.user
+    const scope = anonymous ? 'global' : req.query.scope || 'global'
+    const value = anonymous ? undefined : req.query.value
+    const take = anonymous
+      ? PUBLIC_LIMIT
+      : Math.min(100, Number(req.query.limit) || 20)
 
     const where = { available: true }
     if (scope === 'category' && value) where.category = value
@@ -38,6 +47,7 @@ router.get(
     res.json({
       scope,
       value: value || null,
+      limited: anonymous,
       items: creators.map((c, i) => publicCreator(c, { listPosition: i + 1 })),
     })
   }),
