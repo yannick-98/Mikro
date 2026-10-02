@@ -8,19 +8,24 @@
 
 ## 1. La idea
 
-Las tres secciones **no son tres pantallas distintas**: son tres estados de una misma
-pieza. Un grupo de tarjetas de creadores entra en escena girando, colapsa en un
-ranking y después se da la vuelta para enseñar su reverso.
+Las tres primeras secciones **no son tres pantallas distintas**: son tres estados de
+una misma pieza. Un grupo de tarjetas de creadores entra en escena girando, colapsa en
+un ranking y después se da la vuelta para enseñar su reverso.
 
 | Sección | Estado de la pieza | Qué cuenta | A quién habla |
 |---|---|---|---|
 | 1. Órbita | Las tarjetas giran en círculo | "Esto está vivo, hay gente aquí" | A los dos |
 | 2. Podio | La órbita colapsa en un ranking | "Aquí se mide quién mueve de verdad" | Al creador |
 | 3. Reverso | El panel gira y muestra su espalda | "Y esto es lo que gana tu marca" | A la empresa |
+| 4. Demo | Otra pantalla: la tercera sube y esta entra por abajo | "Te lo enseñamos con tu marca delante" | A la empresa |
 
 Es, literalmente, el recorrido del producto: **descubres → comparas → contratas**. La
 originalidad no está en el efecto, sino en que el efecto *significa* algo: la misma
 materia se reordena según quién la mire.
+
+La cuarta rompe la regla a propósito. Después de dos transiciones con truco, un
+desplazamiento normal es lo que le dice al visitante que ha dejado el escaparate y ha
+llegado al sitio donde se escribe algo.
 
 **Lema:** *Marcas que conectan. Creadores que inspiran.*
 Recupera la frase de la referencia original del proyecto y tiene la ventaja de nombrar
