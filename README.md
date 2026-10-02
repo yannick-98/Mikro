@@ -85,7 +85,7 @@ frontend sigue llamando a `/api/...` sin cambios.
 |---|---|---|
 | Web | Netlify (estático) | `frontend/dist`, con redirección SPA a `index.html` |
 | API | Netlify Functions | `netlify/functions/api.js` envuelve el mismo Express con `serverless-http` |
-| Datos | SQLite sembrada en el build | Se copia a `/tmp` en el arranque en frío de la función |
+| Datos | Postgres gestionado (Supabase) | `DATABASE_URL` (pooler) y `DIRECT_DATABASE_URL` (migraciones) |
 
 Todo está en [`netlify.toml`](netlify.toml). El comando de build (`npm run
 build:netlify`) genera el cliente de Prisma, crea y siembra la base, y compila la web.
@@ -99,21 +99,25 @@ npm run build:netlify && netlify deploy --prod --dir frontend/dist --functions n
 En Windows conviene parar antes el servidor de desarrollo: mantiene abierto el motor de
 Prisma y `prisma generate` no puede reemplazarlo.
 
-**Límite importante de esta demo:** el sistema de ficheros de una función serverless es
-efímero. Los cambios que se hagan en la demo pública (nuevas campañas, candidaturas,
-colaboraciones) viven mientras dure la instancia de la función y se pierden cuando se
-recicla, volviendo a los datos de partida. Es suficiente para enseñar el producto, pero
-no es persistencia real.
+Lo que se cree en la demo (campañas, candidaturas, colaboraciones) **persiste**: está
+comprobado que sobrevive a un redespliegue.
 
-Para un entorno con datos permanentes hay dos caminos, y ambos tocan un solo punto del
-código (el `datasource` de Prisma):
+### Dos detalles de conectar Prisma a un pooler
 
-1. **Postgres gestionado** (Neon, Supabase o el Postgres de Netlify): se cambia el
-   proveedor en `backend/prisma/schema.prisma` y se define `DATABASE_URL` en las
-   variables de entorno del sitio.
-2. **Backend en un host con estado** (Render, Railway o un VPS): se despliega
-   `backend/` tal cual y se define `VITE_API_URL` en Netlify apuntando a ese dominio.
-   El cliente ya contempla esa variable.
+Ambos costaron un rato y conviene no olvidarlos al cambiar de proveedor:
+
+1. **La aplicación usa el pooler y las migraciones no.** Un pooler en modo transacción
+   no mantiene la sesión, así que `prisma db push` y el seed van por
+   `DIRECT_DATABASE_URL` (puerto 5432 en Supabase). Si el seed va por el pooler, corta
+   a mitad y deja la base incompleta.
+2. **`pgbouncer=true` en la cadena de la aplicación.** Sin él, Prisma reutiliza
+   *prepared statements* que el pooler no conserva y las consultas fallan. Lo añade
+   `backend/src/lib/prisma.js` automáticamente al detectar un host de pooler, junto
+   con `connection_limit=1` cuando corre en serverless.
+
+Si prefieres un backend con estado (Render, Railway, un VPS), despliega `backend/` tal
+cual y define `VITE_API_URL` en Netlify apuntando a ese dominio: el cliente ya contempla
+esa variable.
 
 ## Qué incluye
 
