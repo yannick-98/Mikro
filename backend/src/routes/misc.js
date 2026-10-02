@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { prisma } from '../lib/prisma.js'
 import { asyncHandler } from '../lib/http.js'
+import { forget, publicCache, remember } from '../lib/cache.js'
 import { requireAuth, requireRole } from '../middleware/auth.js'
 import { recomputeRanking } from '../services/creatorStats.js'
 import { publicCreator } from '../services/serialize.js'
@@ -11,6 +12,14 @@ const router = Router()
 router.get(
   '/stats/home',
   asyncHandler(async (_req, res) => {
+    // Son cifras de escaparate: con que esten al dia basta.
+    publicCache(res, { maxAge: 120, swr: 600 })
+    return res.json(await remember('stats:home', 120, () => computeHomeStats()))
+  }),
+)
+
+async function computeHomeStats() {
+  {
     const [creators, brands, openCampaigns, deals, paid] = await Promise.all([
       prisma.creator.count({ where: { available: true } }),
       prisma.brand.count(),
@@ -27,7 +36,7 @@ router.get(
     // "Empresas buscando creadores hoy": marcas con campana abierta.
     const searchingToday = await prisma.brand.count({ where: { campaigns: { some: { status: 'OPEN' } } } })
 
-    res.json({
+    return {
       creators,
       brands,
       openCampaigns,
@@ -36,9 +45,9 @@ router.get(
       paidOut: paid._sum.fee || 0,
       totalReach: agg._sum.totalFollowers || 0,
       avgEngagement: Math.round((agg._avg.engagementRate || 0) * 100) / 100,
-    })
-  }),
-)
+    }
+  }
+}
 
 router.get(
   '/notifications',
@@ -165,6 +174,7 @@ router.post(
       where: { id: req.params.id },
       data: { verified: req.body?.verified !== false },
     })
+    forget('rankings:public')
     res.json({ creator: { id: creator.id, verified: creator.verified } })
   }),
 )
@@ -177,6 +187,7 @@ router.post(
       where: { id: req.params.id },
       data: { featured: req.body?.featured !== false },
     })
+    forget('rankings:public')
     res.json({ creator: { id: creator.id, featured: creator.featured } })
   }),
 )
@@ -186,6 +197,7 @@ router.post(
   requireRole('ADMIN'),
   asyncHandler(async (_req, res) => {
     const count = await recomputeRanking()
+    forget()
     res.json({ ok: true, creators: count })
   }),
 )

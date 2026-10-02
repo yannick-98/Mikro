@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { prisma } from '../lib/prisma.js'
 import { asyncHandler } from '../lib/http.js'
+import { publicCache, remember } from '../lib/cache.js'
 import { publicCreator } from '../services/serialize.js'
 import { CATEGORIES, CITIES } from '../services/taxonomy.js'
 
@@ -27,29 +28,33 @@ router.get(
       ? PUBLIC_LIMIT
       : Math.min(100, Number(req.query.limit) || 20)
 
-    const where = { available: true }
-    if (scope === 'category' && value) where.category = value
-    if (scope === 'city' && value) where.city = value
+    const query = async () => {
+      const where = { available: true }
+      if (scope === 'category' && value) where.category = value
+      if (scope === 'city' && value) where.city = value
 
-    let creators = await prisma.creator.findMany({
-      where,
-      include: INCLUDE,
-      orderBy: [{ score: 'desc' }, { totalFollowers: 'desc' }],
-      take: scope === 'platform' ? 300 : take,
-    })
+      let creators = await prisma.creator.findMany({
+        where,
+        include: INCLUDE,
+        orderBy: [{ score: 'desc' }, { totalFollowers: 'desc' }],
+        take: scope === 'platform' ? 300 : take,
+      })
 
-    if (scope === 'platform' && value) {
-      creators = creators
-        .filter((c) => c.socialAccounts.some((a) => a.platform === value))
-        .slice(0, take)
+      if (scope === 'platform' && value) {
+        creators = creators
+          .filter((c) => c.socialAccounts.some((a) => a.platform === value))
+          .slice(0, take)
+      }
+
+      return creators.map((c, i) => publicCreator(c, { listPosition: i + 1 }))
     }
 
-    res.json({
-      scope,
-      value: value || null,
-      limited: anonymous,
-      items: creators.map((c, i) => publicCreator(c, { listPosition: i + 1 })),
-    })
+    // El ranking publico es el mismo para todo el mundo y cambia una vez al
+    // dia: no tiene sentido ir a la base en cada visita a la portada.
+    const items = anonymous ? await remember('rankings:public', 120, query) : await query()
+    if (anonymous) publicCache(res, { maxAge: 120, swr: 600 })
+
+    res.json({ scope, value: value || null, limited: anonymous, items })
   }),
 )
 

@@ -15,6 +15,27 @@ export const PHASES = {
   flip: [0.7, 0.92], // el panel gira sobre su eje
 }
 
+/**
+ * Puntos de reposo y zonas muertas.
+ *
+ * Entre dos secciones no hay nada que mirar: la pieza esta a medio recoger o
+ * el panel de canto. Si el usuario suelta el scroll ahi, la escena se lleva
+ * sola al estado estable mas cercano en vez de quedarse a medias.
+ */
+export const RESTS = { hero: 0.06, rank: 0.63, brands: 0.99 }
+export const DEAD_ZONES = [
+  [0.2, 0.58, RESTS.hero, RESTS.rank],
+  [0.71, 0.96, RESTS.rank, RESTS.brands],
+]
+
+/** Destino al que llevar la escena, o null si ya esta en reposo. */
+export function snapTarget(p) {
+  for (const [from, to, before, after] of DEAD_ZONES) {
+    if (p > from && p < to) return p < (from + to) / 2 ? before : after
+  }
+  return null
+}
+
 export const clamp = (v, min = 0, max = 1) => Math.max(min, Math.min(max, v))
 
 /** Progreso de 0 a 1 dentro de un tramo [a, b]. */

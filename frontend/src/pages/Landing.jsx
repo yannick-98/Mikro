@@ -17,6 +17,7 @@ import {
   orbitSlot,
   prefersStatic,
   sceneMetrics,
+  snapTarget,
   toTransform,
 } from '../components/landing/scene'
 
@@ -61,13 +62,16 @@ function Header() {
 }
 
 /** Fondo: aurora de tres luces y la trama que usa el resto de la aplicacion. */
-function Backdrop() {
+function Backdrop({ auroraRef, gridRef }) {
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden">
-      <div className="landing-aurora landing-aurora-1" />
-      <div className="landing-aurora landing-aurora-2" />
-      <div className="landing-aurora landing-aurora-3" />
+      <div ref={auroraRef} className="absolute inset-[-25%]">
+        <div className="landing-aurora landing-aurora-1" />
+        <div className="landing-aurora landing-aurora-2" />
+        <div className="landing-aurora landing-aurora-3" />
+      </div>
       <div
+        ref={gridRef}
         className="absolute inset-0 opacity-[0.06]"
         style={{
           backgroundImage:
@@ -135,6 +139,8 @@ export default function Landing() {
   const backFaceRef = useRef(null)
   const backInnerRef = useRef(null)
   const orbitRef = useRef(null)
+  const auroraRef = useRef(null)
+  const gridRef = useRef(null)
 
   // Estado del bucle: nada de esto pasa por React, se escribe directo al DOM.
   const loop = useRef({ p: 0, spin: 0, last: 0, paused: false, slots: [] })
@@ -151,6 +157,17 @@ export default function Landing() {
       .catch(() => {})
     return () => {
       alive = false
+    }
+  }, [])
+
+  // Una landing empieza por el principio: si el navegador restaura la posicion
+  // anterior, se entra a media transicion y no se entiende nada.
+  useEffect(() => {
+    const previous = window.history.scrollRestoration
+    if (previous) window.history.scrollRestoration = 'manual'
+    window.scrollTo(0, 0)
+    return () => {
+      if (previous) window.history.scrollRestoration = previous
     }
   }, [])
 
@@ -232,6 +249,12 @@ export default function Landing() {
         el.style.zIndex = String(Math.round(100 + t.z / 10))
       })
 
+      // El fondo sube con el scroll: la capa esta fija, pero el decorado se
+      // desplaza y da la sensacion de estar bajando por la pagina. La trama
+      // corre mas que las luces, que quedan "mas lejos".
+      if (gridRef.current) gridRef.current.style.backgroundPosition = `0px ${(-state.p * 620).toFixed(1)}px`
+      if (auroraRef.current) auroraRef.current.style.transform = `translate3d(0, ${(-state.p * 230).toFixed(1)}px, 0)`
+
       // Hero: sube y se desvanece al empezar la absorcion.
       const out = between(state.p, PHASES.heroOut)
       if (heroCopyRef.current) {
@@ -281,6 +304,50 @@ export default function Landing() {
     raf = requestAnimationFrame(frame)
     return () => cancelAnimationFrame(raf)
   }, [isStatic, creators])
+
+  /**
+   * Si el scroll se detiene en mitad de una transicion, la escena se lleva
+   * sola al estado estable mas cercano. Quedarse entre dos secciones no es un
+   * sitio donde haya nada que leer.
+   */
+  useEffect(() => {
+    if (isStatic) return undefined
+
+    let timer
+    let settling = false
+
+    const settle = () => {
+      const scene = sceneRef.current
+      if (!scene || settling) return
+
+      const rect = scene.getBoundingClientRect()
+      const total = rect.height - window.innerHeight
+      if (total <= 0) return
+
+      const p = clamp(-rect.top / total)
+      const target = snapTarget(p)
+      if (target === null) return
+
+      settling = true
+      window.scrollTo({ top: scene.offsetTop + total * target, behavior: 'smooth' })
+      // Si el usuario vuelve a mover la rueda, el navegador cancela el
+      // desplazamiento solo; el margen evita encadenar dos seguidos.
+      setTimeout(() => {
+        settling = false
+      }, 900)
+    }
+
+    const onScroll = () => {
+      clearTimeout(timer)
+      timer = setTimeout(settle, 160)
+    }
+
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => {
+      window.removeEventListener('scroll', onScroll)
+      clearTimeout(timer)
+    }
+  }, [isStatic])
 
   const pause = () => (loop.current.paused = true)
   const resume = () => (loop.current.paused = false)
@@ -343,7 +410,7 @@ export default function Landing() {
 
       <div ref={sceneRef} className="relative h-[340vh]">
         <div className="sticky top-0 h-screen overflow-hidden">
-          <Backdrop />
+          <Backdrop auroraRef={auroraRef} gridRef={gridRef} />
 
           <HeroCopy innerRef={heroCopyRef} />
 
