@@ -4,6 +4,7 @@ import { BadgeCheck, Building2, Euro, RefreshCw, Star, Users } from 'lucide-reac
 import { api } from '../api/client'
 import Layout from '../components/Layout'
 import { StatCard } from '../components/Dashboard'
+import DemoInbox from '../components/DemoInbox'
 import { Avatar, Spinner, Toast, VerifiedBadge, useAsync, useToast } from '../components/ui'
 import { formatEuro, formatFollowers, formatNumber, formatPercent } from '../lib/format'
 
@@ -86,6 +87,8 @@ export default function Admin() {
                 tone="text-emerald-600"
               />
             </div>
+
+            <DemoInbox onError={show.error} />
 
             <section className="card p-6">
               <h2 className="text-[16px] font-extrabold tracking-tight">Perfiles pendientes de verificar</h2>

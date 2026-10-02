@@ -2,7 +2,7 @@ import { Router } from 'express'
 import { prisma } from '../lib/prisma.js'
 import { asyncHandler } from '../lib/http.js'
 import { publicCache, remember } from '../lib/cache.js'
-import { publicCreator } from '../services/serialize.js'
+import { landingCreator, publicCreator } from '../services/serialize.js'
 import { CATEGORIES, CITIES } from '../services/taxonomy.js'
 
 const router = Router()
@@ -28,6 +28,32 @@ router.get(
       ? PUBLIC_LIMIT
       : Math.min(100, Number(req.query.limit) || 20)
 
+    // El escaparate pide poco y lo pide siempre igual: se consulta solo lo que
+    // la portada pinta, en vez de traer la ficha completa para usar seis campos.
+    const publicQuery = async () => {
+      const creators = await prisma.creator.findMany({
+        // Con al menos una pieza publicada. El escaparate ensena su trabajo:
+        // una ficha vacia no tiene nada que ensenar, y asi ninguna cuenta a
+        // medio hacer acaba en el podio que ve quien llega por primera vez.
+        where: { available: true, portfolio: { some: {} } },
+        select: {
+          id: true,
+          handle: true,
+          displayName: true,
+          avatarUrl: true,
+          category: true,
+          verified: true,
+          totalFollowers: true,
+          score: true,
+          rankDelta: true,
+          portfolio: { orderBy: { position: 'asc' }, take: 1, select: { imageUrl: true } },
+        },
+        orderBy: [{ score: 'desc' }, { totalFollowers: 'desc' }],
+        take: PUBLIC_LIMIT,
+      })
+      return creators.map((c, i) => landingCreator(c, i + 1))
+    }
+
     const query = async () => {
       const where = { available: true }
       if (scope === 'category' && value) where.category = value
@@ -51,7 +77,7 @@ router.get(
 
     // El ranking publico es el mismo para todo el mundo y cambia una vez al
     // dia: no tiene sentido ir a la base en cada visita a la portada.
-    const items = anonymous ? await remember('rankings:public', 120, query) : await query()
+    const items = anonymous ? await remember('rankings:public', 120, publicQuery) : await query()
     if (anonymous) publicCache(res, { maxAge: 120, swr: 600 })
 
     res.json({ scope, value: value || null, limited: anonymous, items })

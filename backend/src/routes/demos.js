@@ -137,4 +137,21 @@ router.patch(
   }),
 )
 
+/**
+ * Borrado de una peticion.
+ *
+ * El formulario promete "los borramos si lo pides". Una promesa que no se
+ * puede cumplir desde el backoffice no es una promesa, es una frase bonita.
+ */
+router.delete(
+  '/:id',
+  requireRole('ADMIN'),
+  asyncHandler(async (req, res) => {
+    const existing = await prisma.demoRequest.findUnique({ where: { id: req.params.id } })
+    if (!existing) throw notFound('Esa peticion no existe')
+    await prisma.demoRequest.delete({ where: { id: req.params.id } })
+    res.json({ ok: true, id: req.params.id })
+  }),
+)
+
 export default router

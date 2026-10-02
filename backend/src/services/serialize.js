@@ -115,3 +115,28 @@ export function publicCampaign(campaign, extra = {}) {
     ...extra,
   }
 }
+
+/**
+ * Forma minima para el ranking publico de la landing.
+ *
+ * La portada pinta una tarjeta y una fila: nombre, categoria, seguidores,
+ * puntuacion, movimiento y una portada. Devolver la ficha entera son 20 KB por
+ * visita para usar cinco campos, y encima expone tarifas y audiencia a quien
+ * todavia no ha entrado.
+ */
+export function landingCreator(creator, position) {
+  const cover = (creator.portfolio || [])[0]
+  return {
+    id: creator.id,
+    handle: creator.handle,
+    displayName: creator.displayName,
+    avatarUrl: creator.avatarUrl,
+    category: creator.category,
+    verified: creator.verified,
+    totalFollowers: creator.totalFollowers,
+    score: creator.score,
+    rankDelta: creator.rankDelta,
+    listPosition: position,
+    portfolio: cover ? [{ imageUrl: cover.imageUrl }] : [],
+  }
+}

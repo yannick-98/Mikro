@@ -69,14 +69,16 @@ async function main() {
     body: {
       companyName: 'Smoke SL',
       contactName: 'Prueba Humo',
-      email: `humo+${Date.now()}@mikro.test`,
+      email: 'humo@mikro.test',
       sector: 'Alimentacion',
       teamSize: '6-20',
       monthlyBudget: '300-800',
       consent: true,
     },
   })
-  check('peticion de demo', demo.status === 201 && !!demo.json.request?.id)
+  // Siempre el mismo correo: la segunda ejecucion del dia actualiza la ficha
+  // en vez de dejar una fila nueva en la bandeja de alguien.
+  check('peticion de demo', [200, 201].includes(demo.status) && !!demo.json.request?.id)
 
   const sinConsentimiento = await call('/demo-requests', {
     method: 'POST',
@@ -267,6 +269,16 @@ async function main() {
   const adminOverview = await call('/admin/overview', { token: admin.json.token })
   check('panel de administracion', adminOverview.json.stats?.creators > 0)
   check('ingresos de plataforma', adminOverview.json.stats?.revenue >= 30)
+
+  // La prueba se lleva lo suyo: el creador de usar y tirar se marca como no
+  // disponible para que no aparezca en los rankings de nadie. No se borra
+  // nada, solo deja de contar.
+  const retirado = await call('/creators/me', {
+    method: 'PATCH',
+    token: creatorToken,
+    body: { available: false },
+  })
+  check('la cuenta de prueba se retira', retirado.json.creator?.available === false)
 
   console.log(`\n=== ${passed} correctas, ${failed} fallidas ===\n`)
   process.exit(failed > 0 ? 1 : 0)

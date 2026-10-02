@@ -72,6 +72,7 @@ export const api = {
   requestDemo: (payload) => request('/demo-requests', { method: 'POST', body: payload }),
   demoRequests: (params) => request(`/demo-requests${qs(params)}`),
   updateDemoRequest: (id, payload) => request(`/demo-requests/${id}`, { method: 'PATCH', body: payload }),
+  deleteDemoRequest: (id) => request(`/demo-requests/${id}`, { method: 'DELETE' }),
 
   // Perfil de creador
   myCreator: () => request('/creators/me'),

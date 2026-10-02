@@ -66,6 +66,12 @@ la muestra como chips para que el usuario entienda por qué ve esos resultados.
 
 ## Rankings
 
+Sin sesión, `GET /rankings` devuelve siempre el top 10 global —ignora `scope`,
+`value` y `limit`— y en una forma recortada: solo los campos que pinta la
+portada. Son 5 KB en vez de 20, y no expone tarifas ni datos de audiencia a
+quien todavía no ha entrado. Además exige al menos una pieza de portfolio: el
+escaparate enseña trabajo, y una ficha vacía no tiene nada que enseñar.
+
 | Método | Ruta | Rol | Descripción |
 |---|---|---|---|
 | GET | `/rankings?scope=global\|category\|city\|platform&value=&limit=` | público | Ranking filtrado. |
@@ -186,6 +192,7 @@ una acción fuera de orden devuelve 400 y una ejecutada por quien no corresponde
 | POST | `/demo-requests` | público | Alta de una petición desde la landing. Si el mismo email ya tiene una petición `NEW` de las últimas 24 h, se actualiza en vez de duplicarse (devuelve 200 con `updated: true` en lugar de 201). |
 | GET | `/demo-requests` | ADMIN | Bandeja de leads. Acepta `status` y `limit`; devuelve también `pending`, el número de peticiones sin atender. |
 | PATCH | `/demo-requests/:id` | ADMIN | Cambia `status` (`NEW`, `CONTACTED`, `SCHEDULED`, `WON`, `LOST`) y las notas internas. |
+| DELETE | `/demo-requests/:id` | ADMIN | Borra la petición y sus datos de contacto. El formulario promete «los borramos si lo pides»; esto es lo que lo cumple. |
 
 Cuerpo del POST: `companyName`, `contactName`, `email` y `consent: true` son
 obligatorios. Opcionales: `phone`, `website`, `sector`, `city`, `teamSize`
