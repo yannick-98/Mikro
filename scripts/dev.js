@@ -15,8 +15,18 @@ const bin = (name) => path.join(root, 'node_modules', '.bin', process.platform =
 
 const COLORS = { api: '\x1b[36m', web: '\x1b[35m', reset: '\x1b[0m', dim: '\x1b[2m' }
 
+// El puerto del API se fija aqui y no se hereda: hay entornos que exportan
+// PORT para la web (los previews, por ejemplo) y el API acababa intentando
+// escuchar donde ya esta Vite, con lo que el proxy caia con ECONNREFUSED.
+const API_PORT = process.env.API_PORT || '4000'
+
 const services = [
-  { name: 'api', command: bin('nodemon'), args: ['backend/src/server.js'] },
+  {
+    name: 'api',
+    command: bin('nodemon'),
+    args: ['backend/src/server.js'],
+    env: { PORT: API_PORT },
+  },
   { name: 'web', command: bin('vite'), args: ['--config', 'frontend/vite.config.js'] },
 ]
 
@@ -45,6 +55,7 @@ for (const service of services) {
   const child = spawn(service.command, service.args, {
     cwd: root,
     shell: process.platform === 'win32',
+    env: { ...process.env, ...service.env },
   })
   children.push(child)
 
@@ -63,7 +74,7 @@ process.on('SIGTERM', () => shutdown(0))
 
 console.log(`
   Mikro en marcha
-    API : http://localhost:4000/api/health
+    API : http://localhost:${API_PORT}/api/health
     Web : http://localhost:5173
 
   Cuentas de prueba (contrasena mikro1234):

@@ -68,6 +68,11 @@ export const api = {
   collections: () => request('/rankings/collections'),
   homeStats: () => request('/stats/home'),
 
+  // Captacion de empresas
+  requestDemo: (payload) => request('/demo-requests', { method: 'POST', body: payload }),
+  demoRequests: (params) => request(`/demo-requests${qs(params)}`),
+  updateDemoRequest: (id, payload) => request(`/demo-requests/${id}`, { method: 'PATCH', body: payload }),
+
   // Perfil de creador
   myCreator: () => request('/creators/me'),
   updateCreator: (payload) => request('/creators/me', { method: 'PATCH', body: payload }),

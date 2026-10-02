@@ -28,18 +28,18 @@ export default function BrandsFace({ stats }) {
         <span className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/[0.04] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-white/55">
           Para empresas
         </span>
-        <h2 className="mt-3 text-[27px] font-black leading-tight tracking-[-0.04em] text-white sm:text-[34px]">
+        <h2 className="mt-2.5 text-[27px] font-black leading-tight tracking-[-0.04em] text-white sm:text-[33px]">
           Al otro lado del ranking está{' '}
           <span className="bg-gradient-to-r from-brand-400 to-violet-300 bg-clip-text text-transparent">tu campaña</span>
         </h2>
       </div>
 
-      <div className="mt-6 grid gap-5 lg:grid-cols-[1.05fr_1fr]">
-        <div className="grid gap-2.5 sm:grid-cols-2">
+      <div className="mt-6 grid gap-5 lg:grid-cols-[1.12fr_1fr] lg:gap-8">
+        <div className="grid gap-3.5 sm:grid-cols-2">
           {BENEFITS.map((b) => (
             <div
               key={b.title}
-              className="rounded-2xl border border-white/[0.07] bg-white/[0.03] p-4 transition hover:border-white/15 hover:bg-white/[0.06]"
+              className="rounded-2xl border border-white/[0.07] bg-white/[0.03] p-5 transition hover:border-white/15 hover:bg-white/[0.06]"
             >
               <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-500/15 text-brand-300">
                 <b.icon size={15} />
@@ -51,7 +51,7 @@ export default function BrandsFace({ stats }) {
         </div>
 
         <div className="flex flex-col gap-4">
-          <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-4">
+          <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5">
             <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.16em] text-white/35">Cómo funciona</p>
             <ol className="space-y-3">
               {STEPS.map((s, i) => (
@@ -69,7 +69,7 @@ export default function BrandsFace({ stats }) {
           </div>
 
           {/* Una pyme real contandolo pesa mas que cualquier adjetivo nuestro. */}
-          <blockquote className="rounded-2xl border border-white/[0.07] bg-gradient-to-br from-brand-500/[0.09] to-transparent p-4">
+          <blockquote className="rounded-2xl border border-white/[0.07] bg-gradient-to-br from-brand-500/[0.09] to-transparent p-5">
             <p className="text-[14px] font-semibold leading-snug text-white/85">
               «Con 400 euros hicimos más ruido que con seis meses de anuncios.»
             </p>
@@ -80,9 +80,9 @@ export default function BrandsFace({ stats }) {
         </div>
       </div>
 
-      <div className="mt-5 flex flex-wrap items-center justify-between gap-4 border-t border-white/[0.07] pt-4">
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-5 border-t border-white/[0.07] pt-4">
         {stats ? (
-          <div className="flex gap-7">
+          <div className="flex gap-9 lg:gap-14">
             <div>
               <p className="text-[19px] font-black leading-none text-white">{formatNumber(stats.creators)}</p>
               <p className="mt-1 text-[11px] font-semibold text-white/40">creadores</p>
@@ -95,7 +95,7 @@ export default function BrandsFace({ stats }) {
               <p className="text-[19px] font-black leading-none text-white">{stats.avgEngagement}%</p>
               <p className="mt-1 text-[11px] font-semibold text-white/40">engagement medio</p>
             </div>
-            <div className="hidden sm:block">
+            <div>
               <p className="text-[19px] font-black leading-none text-white">12%</p>
               <p className="mt-1 text-[11px] font-semibold text-white/40">comisión única</p>
             </div>

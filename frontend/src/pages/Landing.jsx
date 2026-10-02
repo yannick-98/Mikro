@@ -6,6 +6,7 @@ import { Logo } from '../components/ui'
 import PostCard from '../components/landing/PostCard'
 import Podium from '../components/landing/Podium'
 import BrandsFace from '../components/landing/BrandsFace'
+import DemoFace from '../components/landing/DemoFace'
 import {
   PHASES,
   between,
@@ -21,6 +22,7 @@ import {
   TRANSITION_MS,
   durationFor,
   sceneMetrics,
+  slideOffsets,
   toTransform,
 } from '../components/landing/scene'
 
@@ -141,6 +143,8 @@ export default function Landing() {
   const backFaceRef = useRef(null)
   const backInnerRef = useRef(null)
   const orbitRef = useRef(null)
+  const stageRef = useRef(null)
+  const demoRef = useRef(null)
   const auroraRef = useRef(null)
   const gridRef = useRef(null)
 
@@ -213,7 +217,25 @@ export default function Landing() {
 
     const step = (dir) => goTo((loop.current.index ?? 0) + dir)
 
+    /**
+     * Deja pasar el gesto cuando ocurre dentro de la demo y ahi todavia queda
+     * recorrido. En una ventana baja el formulario no cabe entero, y si la
+     * escena se quedase siempre con la rueda no habria forma de llegar al
+     * boton de enviar.
+     */
+    const dejaPasar = (target, dir) => {
+      const box = demoRef.current
+      if (!box || !box.contains(target)) return false
+      const margen = dir > 0 ? box.scrollHeight - box.clientHeight - box.scrollTop : box.scrollTop
+      return margen > 1
+    }
+
+    /** Escribir en el formulario no es navegar: el espacio es un espacio. */
+    const escribiendo = (el) =>
+      !!el && (el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName))
+
     const onWheel = (e) => {
+      if (dejaPasar(e.target, e.deltaY)) return
       e.preventDefault()
       if (loop.current.moving) return
 
@@ -234,9 +256,10 @@ export default function Landing() {
       touchY = e.touches[0].clientY
     }
     const onTouchMove = (e) => {
+      const delta = touchY - e.touches[0].clientY
+      if (dejaPasar(e.target, delta)) return
       e.preventDefault()
       if (loop.current.moving) return
-      const delta = touchY - e.touches[0].clientY
       if (Math.abs(delta) > 55) {
         step(delta > 0 ? 1 : -1)
         touchY = e.touches[0].clientY
@@ -244,6 +267,7 @@ export default function Landing() {
     }
 
     const onKey = (e) => {
+      if (escribiendo(e.target)) return
       const next = { ArrowDown: 1, PageDown: 1, ' ': 1, ArrowUp: -1, PageUp: -1 }[e.key]
       if (next) {
         e.preventDefault()
@@ -390,7 +414,8 @@ export default function Landing() {
         const fit = Math.min(1, (window.innerHeight - 96) / Math.max(natural, 1))
         panelRef.current.style.transform = `perspective(${persp}px) translateZ(${-away}px) rotateY(${deg}deg) scale(${fit.toFixed(3)})`
         panelRef.current.style.opacity = String(easeOut(appear))
-        panelRef.current.style.pointerEvents = appear > 0.9 ? 'auto' : 'none'
+        panelRef.current.style.pointerEvents =
+          appear > 0.9 && state.p < PHASES.slide[0] + 0.02 ? 'auto' : 'none'
       }
       // backface-visibility no basta: los hijos de una cara no lo heredan y el
       // ranking seguia viendose en espejo detras. Se decide a mano quien manda.
@@ -405,6 +430,21 @@ export default function Landing() {
         const reveal = between(flip, [0.52, 0.9])
         backInnerRef.current.style.opacity = String(reveal)
         backInnerRef.current.style.transform = `translate3d(0, ${(1 - reveal) * 26}px, 0)`
+      }
+
+      // Ultimo tramo: el panel se va por arriba y la demo sube desde abajo.
+      // Aqui no hay truco 3D, es un desplazamiento limpio de dos capas que
+      // recorren la misma distancia a la vez. Se traslada el contenedor y no el
+      // panel para no pisar el rotateY del giro, que vive en su transform.
+      const slide = slideOffsets(state.p, window.innerHeight)
+      if (stageRef.current) {
+        stageRef.current.style.transform = `translate3d(0, ${slide.out.toFixed(1)}px, 0)`
+      }
+      if (demoRef.current) {
+        demoRef.current.style.transform = `translate3d(0, ${slide.in.toFixed(1)}px, 0)`
+        // Ya es visible antes de llegar, pero no se puede escribir en el
+        // formulario hasta que esta quieto: un campo en movimiento no se pulsa.
+        demoRef.current.style.pointerEvents = slide.t > 0.92 ? 'auto' : 'none'
       }
 
       raf = requestAnimationFrame(frame)
@@ -458,8 +498,12 @@ export default function Landing() {
             <Podium creators={creators} />
           </section>
 
-          <section className="px-5 pb-20">
+          <section className="px-5 pb-16">
             <BrandsFace stats={stats} />
+          </section>
+
+          <section className="px-5 pb-20">
+            <DemoFace stats={stats} />
           </section>
         </main>
       </div>
@@ -469,7 +513,7 @@ export default function Landing() {
   // -------------------------------------------------------------------------
   // Escena completa
   // -------------------------------------------------------------------------
-  const LABELS = ['Creadores', 'Ranking', 'Empresas']
+  const LABELS = ['Creadores', 'Ranking', 'Empresas', 'Demo']
 
   return (
     <div className="relative h-screen overflow-hidden bg-ink">
@@ -512,10 +556,10 @@ export default function Landing() {
           <HeroCta innerRef={heroCtaRef} />
 
           {/* El panel que se da la vuelta. */}
-          <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center px-6">
+          <div ref={stageRef} className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center px-6">
             <div
               ref={panelRef}
-              className="landing-panel relative w-full max-w-4xl opacity-0"
+              className="landing-panel relative w-full max-w-6xl opacity-0"
               style={{ transformStyle: 'preserve-3d' }}
             >
               <div ref={frontRef} className="landing-face">
@@ -526,6 +570,17 @@ export default function Landing() {
                   <BrandsFace stats={stats} />
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* Cuarta seccion: espera fuera de pantalla, por debajo. */}
+          <div
+            ref={demoRef}
+            className="absolute inset-0 z-[31] flex items-center justify-center overflow-y-auto px-6 py-10"
+            style={{ transform: 'translate3d(0, 100vh, 0)', pointerEvents: 'none' }}
+          >
+            <div className="mx-auto w-full max-w-6xl">
+              <DemoFace stats={stats} />
             </div>
           </div>
         </div>

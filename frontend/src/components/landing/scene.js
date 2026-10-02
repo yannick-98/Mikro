@@ -13,6 +13,7 @@ export const PHASES = {
   absorb: [0.28, 0.5], // la orbita se recoge en el ranking
   rankIn: [0.44, 0.57], // el panel del ranking aparece
   flip: [0.7, 0.92], // el panel gira sobre su eje
+  slide: [1.0, 1.6], // el panel sube y la demo entra por abajo
 }
 
 /**
@@ -22,7 +23,7 @@ export const PHASES = {
  * la transicion se reproduce entera con su propio tiempo. Asi nunca se queda a
  * medias ni depende de cuanto haya girado la rueda.
  */
-export const STOPS = [0.06, 0.63, 0.99]
+export const STOPS = [0.06, 0.63, 0.99, 1.6]
 
 /** Duracion por defecto de una transicion, en milisegundos. */
 export const TRANSITION_MS = 1500
@@ -37,6 +38,27 @@ export const TRANSITION_MS = 1500
 export function durationFor(from, to) {
   const tocaPrimerTramo = Math.min(from, to) === 0
   return tocaPrimerTramo ? 2000 : TRANSITION_MS
+}
+
+/**
+ * Desplazamiento vertical del tramo de empresas a la demo.
+ *
+ * Aqui no hay metafora que explicar: una seccion se va por arriba y la
+ * siguiente llega por abajo, como en cualquier pagina. Por eso el recorrido se
+ * reparte lineal dentro del tramo, sin suavizado propio: el frenado ya lo pone
+ * travelEase sobre el progreso de la escena, y encadenar dos curvas haria que
+ * pareciese arrastrado.
+ *
+ * Las dos capas se mueven la misma distancia a la vez, asi que nunca se
+ * superponen ni dejan hueco entre ellas.
+ */
+export function slideOffsets(p, viewportHeight) {
+  const t = between(p, PHASES.slide)
+  return {
+    t,
+    out: -t * viewportHeight,
+    in: (1 - t) * viewportHeight,
+  }
 }
 
 /**

@@ -176,3 +176,23 @@ una acción fuera de orden devuelve 400 y una ejecutada por quien no corresponde
 | POST | `/admin/creators/:id/verify` | ADMIN | Verifica un perfil. |
 | POST | `/admin/creators/:id/feature` | ADMIN | Destaca un perfil. |
 | POST | `/admin/ranking/recompute` | ADMIN | Recalcula posiciones y movimientos. |
+
+---
+
+## Peticiones de demo
+
+| Método | Ruta | Rol | Descripción |
+|---|---|---|---|
+| POST | `/demo-requests` | público | Alta de una petición desde la landing. Si el mismo email ya tiene una petición `NEW` de las últimas 24 h, se actualiza en vez de duplicarse (devuelve 200 con `updated: true` en lugar de 201). |
+| GET | `/demo-requests` | ADMIN | Bandeja de leads. Acepta `status` y `limit`; devuelve también `pending`, el número de peticiones sin atender. |
+| PATCH | `/demo-requests/:id` | ADMIN | Cambia `status` (`NEW`, `CONTACTED`, `SCHEDULED`, `WON`, `LOST`) y las notas internas. |
+
+Cuerpo del POST: `companyName`, `contactName`, `email` y `consent: true` son
+obligatorios. Opcionales: `phone`, `website`, `sector`, `city`, `teamSize`
+(`1-5`, `6-20`, `21-50`, `50+`), `monthlyBudget` (`menos-300`, `300-800`,
+`800-2000`, `mas-2000`, `por-decidir`) y `goal`.
+
+`consent` no es decorativo: se guarda como `consentAt` y es lo que legitima la
+llamada posterior. Sin él la petición se rechaza con 400.
+
+Cada alta nueva genera un aviso `DEMO_REQUEST` para los usuarios ADMIN.

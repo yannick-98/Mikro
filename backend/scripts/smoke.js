@@ -51,14 +51,38 @@ async function main() {
   check('busqueda IA interpreta', ai.json.interpretation?.length >= 2, JSON.stringify(ai.json.interpretation))
   check('busqueda IA devuelve resultados', ai.json.items?.length > 0)
 
-  const rank = await call('/rankings?scope=category&value=Fitness&limit=5')
-  check('ranking por categoria', rank.json.items?.every((c) => c.category === 'Fitness'))
+  // Sin sesion el ranking es siempre el top 10 global: la landing no deja
+  // filtrar por categoria y la API tiene que sostener esa promesa, no fiarse
+  // de que el cliente se porte bien.
+  const rank = await call('/rankings?scope=category&value=Fitness&limit=50')
+  check('ranking publico limitado', rank.json.items?.length === 10 && rank.json.limited === true)
+  check('ranking publico sin filtrar', rank.json.scope === 'global' && rank.json.value === null)
 
   const movers = await call('/rankings/movers')
   check('movimientos del dia', movers.json.items?.length > 0)
 
   const stats = await call('/stats/home')
   check('estadisticas de portada', stats.json.creators > 0 && stats.json.searchingToday >= 0)
+
+  const demo = await call('/demo-requests', {
+    method: 'POST',
+    body: {
+      companyName: 'Smoke SL',
+      contactName: 'Prueba Humo',
+      email: `humo+${Date.now()}@mikro.test`,
+      sector: 'Alimentacion',
+      teamSize: '6-20',
+      monthlyBudget: '300-800',
+      consent: true,
+    },
+  })
+  check('peticion de demo', demo.status === 201 && !!demo.json.request?.id)
+
+  const sinConsentimiento = await call('/demo-requests', {
+    method: 'POST',
+    body: { companyName: 'Smoke SL', contactName: 'Prueba Humo', email: 'humo@mikro.test' },
+  })
+  check('demo exige consentimiento', sinConsentimiento.status === 400)
 
   console.log('\n--- Registro y sesion ---')
   const stamp = Date.now()

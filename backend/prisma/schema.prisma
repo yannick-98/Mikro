@@ -34,6 +34,7 @@ model User {
   messages       Message[]
   notifications  Notification[]
   reviewsWritten Review[]       @relation("ReviewAuthor")
+  demoRequests   DemoRequest[]
 }
 
 model Brand {
@@ -272,4 +273,39 @@ model Notification {
   link      String?
   readAt    DateTime?
   createdAt DateTime  @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Captacion de empresas
+// ---------------------------------------------------------------------------
+
+// Peticion de demo desde la landing.
+//
+// Quien rellena este formulario todavia no tiene cuenta, asi que los datos de
+// contacto viven aqui y no en User. Si algun dia se registra, userId los une.
+// consentAt guarda cuando acepto que le escribamos: en Espana eso no es un
+// detalle, es el permiso que legitima la llamada.
+model DemoRequest {
+  id            String    @id @default(cuid())
+  companyName   String
+  contactName   String
+  email         String
+  phone         String?
+  website       String?
+  sector        String?
+  city          String?
+  teamSize      String? // 1-5 | 6-20 | 21-50 | 50+
+  monthlyBudget String? // tramo elegido, no una cifra exacta
+  goal          String? // que quiere conseguir con la campana
+  status        String    @default("NEW") // NEW | CONTACTED | SCHEDULED | WON | LOST
+  source        String    @default("LANDING")
+  notes         String?
+  consentAt     DateTime?
+  userId        String?
+  user          User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([status, createdAt])
+  @@index([email])
 }

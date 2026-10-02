@@ -241,6 +241,40 @@ el acceso a `Recursos`. La escena 3D acaba ahí; nada de efectos en el pie.
 
 ---
 
+## 7 bis. Transición 3 → 4 y sección 4 — La demo
+
+Las tres primeras secciones son estados de una misma pieza. La cuarta no: es otra
+pantalla, y se comporta como tal. El panel de empresas sale por arriba y la demo entra
+por abajo recorriendo la misma distancia a la vez, un viewport exacto, sin huecos ni
+solapes. Dura 1,5 s, igual que el giro, y como las demás se reproduce entera en cuanto
+se detecta el gesto.
+
+No hay metáfora que explicar aquí, y es deliberado: después de dos transiciones con
+truco, un desplazamiento normal es lo que le dice al visitante que ha llegado al sitio
+donde se escribe algo.
+
+**Izquierda:** titular *Te lo enseñamos con tu marca delante*, el argumento comercial y
+qué pasa exactamente en esos veinte minutos (cinco creadores de su sector buscados en
+directo, una campaña redactada en su cuenta). Debajo, las condiciones sin letra pequeña:
+respuesta en 24 h laborables, sin compromiso ni tarjeta.
+
+**Derecha:** el formulario. Obligatorios solo empresa, nombre, email y el consentimiento;
+el resto —teléfono, sector, ciudad, tamaño, presupuesto y objetivo— ayuda a preparar la
+llamada pero no bloquea el envío. No pide cuenta: registrarse antes de ver el producto es
+el orden inverso del que tiene sentido.
+
+Al enviar, la tarjeta se sustituye por la confirmación con el email de destino. Los datos
+van a la tabla `DemoRequest` (ver `docs/API.md`) y generan un aviso para los ADMIN.
+
+Dos detalles de comportamiento que esta sección obliga a añadir:
+
+- La rueda y el gesto táctil **dejan de secuestrarse** cuando ocurren dentro de la demo y
+  ahí todavía queda recorrido. En una ventana baja el formulario no cabe entero.
+- Las teclas de navegación se ignoran mientras el foco está en un campo. El espacio
+  avanzaba de sección: dentro de un formulario, el espacio es un espacio.
+
+---
+
 ## 8. Qué pasa con el resto de la aplicación
 
 La petición es que **el interior sea solo para usuarios**. Eso cambia el enrutado:
@@ -272,7 +306,7 @@ pantallas pequeñas, molesta.
 |---|---|
 | ≥ 1280 px | Escena completa: órbita, absorción y giro. |
 | 768 – 1279 px | Igual, con radio de órbita de 300 px y podio compacto. |
-| < 768 px | **Sin escena 3D.** Tres secciones apiladas: carrusel horizontal con `scroll-snap`, ranking estático y bloque de empresas. Misma información, sin secuestro del scroll. |
+| < 768 px | **Sin escena 3D.** Cuatro secciones apiladas: carrusel horizontal con `scroll-snap`, ranking estático, bloque de empresas y el formulario de demo a una columna. Misma información, sin secuestro del scroll. |
 | `prefers-reduced-motion` | Lo mismo que en móvil, en cualquier tamaño. No es una degradación: es la versión correcta para quien la pide. |
 
 **Gestos que avanzan de sección:** rueda del ratón y trackpad (con acumulador y umbral,

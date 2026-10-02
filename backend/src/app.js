@@ -13,6 +13,7 @@ import applicationRoutes from './routes/applications.js'
 import dealRoutes from './routes/deals.js'
 import searchRoutes from './routes/search.js'
 import rankingRoutes from './routes/rankings.js'
+import demoRoutes from './routes/demos.js'
 import miscRoutes from './routes/misc.js'
 
 /**
@@ -52,6 +53,7 @@ export function createApp() {
   app.use('/api/deals', router(dealRoutes))
   app.use('/api/search', router(searchRoutes))
   app.use('/api/rankings', router(rankingRoutes))
+  app.use('/api/demo-requests', router(demoRoutes))
   app.use('/api', router(miscRoutes))
 
   app.use(notFoundHandler)
