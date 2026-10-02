@@ -11,7 +11,34 @@ import 'dotenv/config'
 import { PrismaClient } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 
-const prisma = new PrismaClient()
+// El seed hace miles de escrituras seguidas: el pooler en modo transaccion no
+// mantiene la sesion y corta a mitad, asi que se usa la conexion directa.
+const seedUrl = process.env.DIRECT_DATABASE_URL || process.env.DATABASE_URL
+
+const prisma = new PrismaClient(seedUrl ? { datasources: { db: { url: seedUrl } } } : {})
+
+/**
+ * El seed borra TODO antes de sembrar. Contra una base remota eso destruiria
+ * los datos de la demo publica, asi que hay que pedirlo de forma explicita.
+ */
+function assertSafeTarget() {
+  const url = process.env.DATABASE_URL || process.env.NETLIFY_DATABASE_URL || ''
+  const isLocal = /localhost|127\.0\.0\.1|file:/.test(url)
+  const allowed = process.env.SEED_ALLOW_REMOTE === '1' || process.argv.includes('--force')
+
+  if (!url) {
+    console.error('No hay DATABASE_URL configurada.')
+    process.exit(1)
+  }
+  if (!isLocal && !allowed) {
+    const host = url.replace(/:\/\/([^:]+):[^@]+@/, '://$1:***@').split('@')[1] || '(desconocido)'
+    console.error(`\nEsta base NO es local (${host}) y el seed borra todos los datos.`)
+    console.error('Si de verdad quieres reiniciarla, ejecuta: npm run seed -- --force\n')
+    process.exit(1)
+  }
+}
+
+assertSafeTarget()
 
 // --- utilidades deterministas ------------------------------------------------
 let seedState = 20260929

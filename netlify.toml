@@ -15,9 +15,9 @@
   # El trazador por defecto sigue mejor los binarios nativos de Prisma que esbuild.
   node_bundler = "nft"
   external_node_modules = ["@prisma/client", ".prisma"]
-  # Con workspaces de npm el cliente de Prisma queda en la raiz, no en backend/.
+  # Los datos viven en Postgres: a la funcion solo le hace falta el cliente de
+  # Prisma con su motor nativo y el esquema.
   included_files = [
-    "backend/prisma/dev.db",
     "backend/prisma/schema.prisma",
     "node_modules/.prisma/client/**",
     "node_modules/@prisma/client/**"
