@@ -7,13 +7,20 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import ShopifyApp from './pages/ShopifyApp'
 import './index.css'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <BrowserRouter>
-      <ShopifyApp />
+      <Routes>
+        <Route path="/shopify" element={<ShopifyApp vista="panel" />} />
+        <Route path="/shopify/configuracion" element={<ShopifyApp vista="configuracion" />} />
+        {/* Shopify abre la app con la ruta que tenga guardada; cualquier otra
+            cosa es el panel. */}
+        <Route path="*" element={<Navigate to="/shopify" replace />} />
+      </Routes>
     </BrowserRouter>
   </React.StrictMode>,
 )

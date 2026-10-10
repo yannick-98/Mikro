@@ -14,7 +14,8 @@ import { shopifyConfigured, toShopDomain } from '../shopify/config.js'
 import { verifySessionToken } from '../shopify/verify.js'
 import { exchangeSessionToken } from '../shopify/tokens.js'
 import { adminGraphql, SHOP_QUERY } from '../shopify/admin.js'
-import { ensureWebhooks } from '../shopify/webhooks.js'
+import { API_VERSION } from '../shopify/config.js'
+import { ensureWebhooks, TOPICS, WEBHOOKS_QUERY } from '../shopify/webhooks.js'
 import { buildCode, createDiscount, deactivateDiscount, normalizeCode } from '../shopify/discounts.js'
 
 const router = Router()
@@ -67,6 +68,11 @@ const publicShop = (shop) => ({
   currency: shop.currency,
   linked: !!shop.brandId,
   brand: shop.brand ? { id: shop.brand.id, companyName: shop.brand.companyName } : null,
+  settings: {
+    codePrefix: shop.codePrefix,
+    defaultPercentage: shop.defaultPercentage,
+    defaultOncePerCustomer: shop.defaultOncePerCustomer,
+  },
 })
 
 // ---------------------------------------------------------------------------
@@ -312,10 +318,10 @@ router.post(
       z.object({
         campaignId: z.string().min(1),
         creatorId: z.string().min(1).optional(),
-        percentage: z.number().int().min(1).max(60).default(10),
+        percentage: z.number().int().min(1).max(60).optional(),
         code: z.string().trim().max(40).optional(),
         endsAt: z.string().datetime().optional(),
-        oncePerCustomer: z.boolean().default(false),
+        oncePerCustomer: z.boolean().optional(),
       }),
       req.body,
     )
@@ -328,8 +334,12 @@ router.post(
       : null
     if (data.creatorId && !creator) throw notFound('Ese creador no existe')
 
-    // Si la tienda escribe su propio codigo, manda el suyo; si no, se genera.
-    const code = data.code ? normalizeCode(data.code) : buildCode(creator?.handle || campaign.title)
+    // Si la tienda escribe su propio codigo, manda el suyo; si no, se genera
+    // con el prefijo que ella haya elegido en la configuracion.
+    const code = data.code
+      ? normalizeCode(data.code)
+      : buildCode(creator?.handle || campaign.title, req.shop.codePrefix)
+    const percentage = data.percentage ?? req.shop.defaultPercentage
     if (data.code && code.length < 3) throw badRequest('El codigo necesita al menos 3 letras o numeros')
 
     // Dos codigos iguales en la misma tienda romperian la atribucion: el
@@ -342,9 +352,9 @@ router.post(
     const discountGid = await createDiscount(req.shop.domain, {
       code,
       title: `Mikro · ${campaign.title}${creator ? ` · ${creator.displayName}` : ''}`,
-      percentage: data.percentage,
+      percentage,
       endsAt: data.endsAt,
-      oncePerCustomer: data.oncePerCustomer,
+      oncePerCustomer: data.oncePerCustomer ?? req.shop.defaultOncePerCustomer,
     })
 
     const attribution = await prisma.shopifyAttribution.create({
@@ -354,7 +364,7 @@ router.post(
         creatorId: creator?.id || null,
         code,
         discountGid,
-        percentage: data.percentage,
+        percentage,
         endsAt: data.endsAt ? new Date(data.endsAt) : null,
       },
     })
@@ -385,6 +395,116 @@ router.post(
       data: { status: 'ENDED' },
     })
     res.json({ attribution: actualizada })
+  }),
+)
+
+// ---------------------------------------------------------------------------
+// Configuracion
+// ---------------------------------------------------------------------------
+
+/**
+ * Todo lo que la pantalla de configuracion necesita, incluido el estado real
+ * de la conexion con Shopify.
+ *
+ * Las suscripciones se consultan en vivo y no se dan por supuestas: si una se
+ * cayo, la tienda tiene derecho a verlo aqui y no a descubrirlo porque sus
+ * ventas dejaron de contarse.
+ */
+router.get(
+  '/settings',
+  requireShop,
+  asyncHandler(async (req, res) => {
+    const shop = req.shop
+
+    let webhooks = null
+    try {
+      const data = await adminGraphql(shop.domain, WEBHOOKS_QUERY)
+      const propios = (data.webhookSubscriptions?.nodes || []).filter(
+        (n) => typeof n.uri === 'string' && n.uri.includes('/api/shopify/webhooks'),
+      )
+      webhooks = TOPICS.map((t) => ({
+        topic: t.topic,
+        activo: propios.some((n) => n.topic === t.topic),
+      }))
+    } catch {
+      // Sin conexion no se inventa un estado: se dice que no se pudo mirar.
+      webhooks = null
+    }
+
+    const attributions = await prisma.shopifyAttribution.findMany({
+      where: { shopId: shop.id },
+      orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
+      include: {
+        creator: { select: { displayName: true, handle: true } },
+        campaign: { select: { title: true } },
+      },
+    })
+
+    res.json({
+      shop: publicShop(shop),
+      apiVersion: API_VERSION,
+      scopes: shop.scopes,
+      installedAt: shop.installedAt,
+      tokenExpires: shop.tokenExpires,
+      webhooks,
+      attributions: attributions.map((a) => ({
+        id: a.id,
+        code: a.code,
+        percentage: a.percentage,
+        status: a.status,
+        ordersCount: a.ordersCount,
+        salesTotal: a.salesTotal,
+        refundedTotal: a.refundedTotal,
+        netTotal: a.salesTotal - a.refundedTotal,
+        creator: a.creator,
+        campaign: a.campaign?.title || null,
+        createdAt: a.createdAt,
+      })),
+    })
+  }),
+)
+
+/** Cambia los valores por defecto con los que se crean los codigos. */
+router.patch(
+  '/settings',
+  requireShop,
+  asyncHandler(async (req, res) => {
+    const data = parseBody(
+      z.object({
+        codePrefix: z.string().trim().max(12).optional(),
+        defaultPercentage: z.number().int().min(1).max(60).optional(),
+        defaultOncePerCustomer: z.boolean().optional(),
+      }),
+      req.body,
+    )
+
+    const cambios = {}
+    if (data.codePrefix !== undefined) {
+      const prefijo = normalizeCode(data.codePrefix)
+      if (prefijo.length < 2) throw badRequest('El prefijo necesita al menos 2 letras o numeros')
+      cambios.codePrefix = prefijo
+    }
+    if (data.defaultPercentage !== undefined) cambios.defaultPercentage = data.defaultPercentage
+    if (data.defaultOncePerCustomer !== undefined) {
+      cambios.defaultOncePerCustomer = data.defaultOncePerCustomer
+    }
+
+    const shop = await prisma.shopifyShop.update({
+      where: { id: req.shop.id },
+      data: cambios,
+      include: { brand: true },
+    })
+    res.json({ shop: publicShop(shop) })
+  }),
+)
+
+/** Vuelve a suscribir lo que falte, para cuando algo se cayo. */
+router.post(
+  '/settings/webhooks',
+  requireShop,
+  asyncHandler(async (req, res) => {
+    const creados = await ensureWebhooks(req.shop.domain)
+    res.json({ creados })
   }),
 )
 

@@ -275,6 +275,33 @@ El formulario de cada campaña pide tres cosas:
 Dos códigos iguales en la misma tienda se rechazan: el webhook no sabría a cuál
 de las dos colaboraciones apuntar la venta.
 
+## La pantalla de configuración
+
+La app tiene dos pantallas, y Shopify las pinta en **su propia barra lateral**
+mediante `<ui-nav-menu>`: *Panel* y *Configuración*. No se monta una navegación
+propia dentro del iframe, que competiría con la del admin.
+
+Eso obliga a servir también las subrutas: `/shopify/*` va a la misma entrada
+HTML, con su cabecera `frame-ancestors`.
+
+Qué hay en Configuración:
+
+- **Cuenta de Mikro** y el botón de desvincular, con aviso de qué se conserva.
+- **Cómo se crean tus códigos**: prefijo, descuento por defecto y si limitar a
+  un uso por cliente. Se guardan por tienda, porque cada marca tiene su
+  convención y la nuestra no tiene por qué ser la suya.
+- **Tus códigos**, con su estado y sus ventas, y la opción de retirarlos.
+  Retirar desactiva el código en la tienda pero conserva el histórico.
+- **Conexión con Shopify**: estado real de cada suscripción, consultado en
+  vivo, con un botón para volver a suscribir lo que se haya caído. Si una se
+  cae dejaríamos de contar ventas sin avisar, así que la tienda tiene derecho
+  a verlo. Además, versión de API, permisos concedidos y caducidad del acceso.
+- **Qué datos guardamos**, en dos párrafos y sin rodeos, con enlace a la
+  política de privacidad.
+
+Dos endpoints que ya existían (`/unlink` y retirar un código) no tenían
+interfaz. Esta pantalla es su sitio.
+
 ## Las ventas en el panel de Mikro
 
 No solo en Shopify:

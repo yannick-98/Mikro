@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import clsx from 'clsx'
 import { Check, Copy, Link2, Loader2, Plus, RotateCcw, Store, TrendingUp, X } from 'lucide-react'
 import { Spinner } from '../components/ui'
+import Configuracion from '../components/shopify/Configuracion'
 import { formatMoney, formatNumber } from '../lib/format'
 
 /**
@@ -163,7 +164,7 @@ function Vincular({ onLink, error }) {
   )
 }
 
-export default function ShopifyApp() {
+export default function ShopifyApp({ vista = 'panel' }) {
   const bridge = useAppBridge()
   const [sesion, setSesion] = useState(null)
   const [datos, setDatos] = useState(null)
@@ -229,8 +230,8 @@ export default function ShopifyApp() {
   }, [llamar])
 
   useEffect(() => {
-    if (sesion?.shop?.linked) cargar()
-  }, [sesion, cargar])
+    if (sesion?.shop?.linked && vista === 'panel') cargar()
+  }, [sesion, cargar, vista])
 
   const vincular = async (credenciales) => {
     setErrorVinculo(null)
@@ -286,6 +287,24 @@ export default function ShopifyApp() {
     return (
       <Marco shop={sesion.shop}>
         <Vincular onLink={vincular} error={errorVinculo} />
+      </Marco>
+    )
+  }
+
+  if (vista === 'configuracion') {
+    return (
+      <Marco shop={sesion.shop}>
+        {error ? (
+          <p className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-[13px] font-semibold text-rose-700">
+            {error}
+          </p>
+        ) : null}
+        <Configuracion
+          llamar={llamar}
+          shop={sesion.shop}
+          onShopChange={(shop) => setSesion((s) => ({ ...s, shop }))}
+          onError={setError}
+        />
       </Marco>
     )
   }
@@ -369,6 +388,7 @@ export default function ShopifyApp() {
                     campaign={c}
                     llamar={llamar}
                     creando={creando === c.id}
+                    ajustes={sesion.shop.settings}
                     onCrear={(datos) => crearCodigo(c.id, datos)}
                   />
                 ) : null}
@@ -410,10 +430,12 @@ export default function ShopifyApp() {
  * nombre se propone a partir del creador elegido, pero se puede escribir: hay
  * marcas que ya tienen una convencion y obligarlas a la nuestra seria absurdo.
  */
-function FormularioCodigo({ campaign, llamar, creando, onCrear }) {
+function FormularioCodigo({ campaign, llamar, creando, onCrear, ajustes }) {
   const [creadores, setCreadores] = useState(null)
   const [creatorId, setCreatorId] = useState('')
-  const [percentage, setPercentage] = useState(10)
+  // Los valores de partida salen de la configuracion de la tienda, no de un
+  // numero escrito aqui: si no, los ajustes no servirian para nada.
+  const [percentage, setPercentage] = useState(ajustes.defaultPercentage)
   const [code, setCode] = useState('')
   const [tocado, setTocado] = useState(false)
 
@@ -430,7 +452,7 @@ function FormularioCodigo({ campaign, llamar, creando, onCrear }) {
   // El codigo propuesto sigue al creador elegido mientras nadie lo haya
   // escrito a mano. En cuanto lo tocas, manda lo que tu pongas.
   const elegido = creadores?.find((c) => c.id === creatorId)
-  const sugerido = `MIKRO-${(elegido?.handle || campaign.title)
+  const sugerido = `${ajustes.codePrefix}-${(elegido?.handle || campaign.title)
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
     .toUpperCase()
@@ -461,6 +483,7 @@ function FormularioCodigo({ campaign, llamar, creando, onCrear }) {
           setCreatorId('')
           setCode('')
           setTocado(false)
+          setPercentage(ajustes.defaultPercentage)
         }
       }}
     >
@@ -544,6 +567,19 @@ function Cifra({ icono: Icono, label, valor, sub }) {
 function Marco({ children, shop }) {
   return (
     <div className="min-h-screen bg-[#f6f6f7] px-5 py-7">
+      {/*
+        Menu nativo del admin: Shopify lo lee y pinta estas secciones en su
+        propia barra lateral, bajo la app. No es un adorno, es como se navega
+        una app incrustada; una barra propia dentro del iframe seria una
+        segunda navegacion compitiendo con la del admin.
+      */}
+      <ui-nav-menu>
+        <a href="/shopify" rel="home">
+          Panel
+        </a>
+        <a href="/shopify/configuracion">Configuración</a>
+      </ui-nav-menu>
+
       <div className="mx-auto max-w-[900px]">
         <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <span className="text-[22px] font-black leading-none tracking-[-0.045em] text-ink">

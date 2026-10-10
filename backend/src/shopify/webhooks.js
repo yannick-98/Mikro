@@ -8,7 +8,7 @@
 import { adminGraphql } from './admin.js'
 import { shopifyEnv } from './config.js'
 
-const LIST = `
+export const WEBHOOKS_QUERY = `
   query suscripciones {
     webhookSubscriptions(first: 50) {
       nodes {
@@ -58,7 +58,7 @@ export async function ensureWebhooks(shopDomain) {
   const { appUrl } = shopifyEnv()
   const base = `${appUrl.replace(/\/$/, '')}/api/shopify/webhooks`
 
-  const data = await adminGraphql(shopDomain, LIST)
+  const data = await adminGraphql(shopDomain, WEBHOOKS_QUERY)
   const existentes = new Set(
     (data.webhookSubscriptions?.nodes || [])
       .filter((n) => typeof n.uri === 'string' && n.uri.startsWith(base))
@@ -78,4 +78,4 @@ export async function ensureWebhooks(shopDomain) {
   return creados
 }
 
-export default { ensureWebhooks, TOPICS }
+export default { ensureWebhooks, TOPICS, WEBHOOKS_QUERY }

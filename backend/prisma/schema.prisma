@@ -338,6 +338,13 @@ model ShopifyShop {
   tokenExpires DateTime?
   scopes       String?
 
+  // Preferencias de la tienda para los codigos que crea. Viven aqui y no en
+  // el codigo porque cada marca tiene su convencion, y la nuestra no tiene
+  // por que ser la suya.
+  codePrefix             String  @default("MIKRO")
+  defaultPercentage      Int     @default(10)
+  defaultOncePerCustomer Boolean @default(false)
+
   // La tienda se vincula a una cuenta de empresa de Mikro. Hasta que alguien
   // la reclama desde la app, la instalacion existe pero no tiene dueno.
   brandId String? @unique
