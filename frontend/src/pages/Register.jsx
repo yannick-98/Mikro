@@ -184,7 +184,15 @@ export default function Register() {
             </button>
 
             <p className="text-center text-[12px] leading-relaxed text-ink/45">
-              Al registrarte aceptas las condiciones de uso y la politica de privacidad de Mikro.
+              Al registrarte aceptas el{' '}
+              <Link to="/aviso-legal" target="_blank" className="font-semibold text-ink/70 underline underline-offset-2 hover:text-ink">
+                aviso legal
+              </Link>{' '}
+              y la{' '}
+              <Link to="/privacidad" target="_blank" className="font-semibold text-ink/70 underline underline-offset-2 hover:text-ink">
+                política de privacidad
+              </Link>{' '}
+              de Mikro.
             </p>
           </form>
 

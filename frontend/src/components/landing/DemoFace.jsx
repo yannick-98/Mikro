@@ -275,7 +275,16 @@ export default function DemoFace({ stats }) {
               />
               <span className="text-[12px] leading-relaxed text-white/45">
                 Acepto que Mikro guarde estos datos para contactarme sobre la demo. Nada más, y los
-                borramos si lo pides.
+                borramos si lo pides. Puedes leer la{' '}
+                <Link
+                  to="/privacidad"
+                  target="_blank"
+                  onClick={(e) => e.stopPropagation()}
+                  className="font-bold text-white/70 underline underline-offset-2 hover:text-white"
+                >
+                  política de privacidad
+                </Link>
+                .
                 {errors.consent ? (
                   <span className="mt-0.5 block font-semibold text-rose-300">{errors.consent}</span>
                 ) : null}

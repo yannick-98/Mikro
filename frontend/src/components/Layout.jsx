@@ -327,8 +327,8 @@ export function Footer() {
       links: [
         { to: '/recursos#sobre', label: 'Sobre Mikro' },
         { to: '/recursos#contacto', label: 'Contacto' },
-        { to: '/recursos#legal', label: 'Aviso legal' },
-        { to: '/recursos#legal', label: 'Privacidad' },
+        { to: '/aviso-legal', label: 'Aviso legal' },
+        { to: '/privacidad', label: 'Privacidad' },
       ],
     },
   ]

@@ -11,6 +11,7 @@ import Resources from './pages/Resources'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import ShopifyApp from './pages/ShopifyApp'
+import { AvisoLegal, Privacidad } from './pages/Legal'
 import NotFound from './pages/NotFound'
 
 import BrandDashboard from './pages/brand/Dashboard'
@@ -81,6 +82,8 @@ export default function App() {
         <Route path="/" element={<Entrada />} />
         <Route path="/rankings" element={<Rankings />} />
         <Route path="/recursos" element={<Resources />} />
+        <Route path="/aviso-legal" element={<AvisoLegal />} />
+        <Route path="/privacidad" element={<Privacidad />} />
         <Route path="/entrar" element={<Login />} />
         <Route path="/registro" element={<Register />} />
 
