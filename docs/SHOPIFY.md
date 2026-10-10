@@ -147,6 +147,43 @@ bien y fallado al crear el primer código.
 
 Al cambiar de versión de API, lo primero es volver a pasar el validador.
 
+## Estado real (probado contra una tienda de desarrollo)
+
+App `Mikro`, id `434025889793`, organización Auttask. Tienda de pruebas:
+`mikro-tienda-de-pruebas.myshopify.com`.
+
+Funciona de punta a punta:
+
+- Instalación gestionada (`use_legacy_install_flow = false`).
+- App Bridge y token de sesión dentro del admin.
+- **Canje de token**: devuelve un token `shpua_` con caducidad a una hora y su
+  token de refresco, guardados en `ShopifyShop`.
+- **Admin API**: la consulta de tienda trae nombre, moneda, plan y país.
+- **Códigos de descuento**: creado uno real (`MIKRO-MARTAGARCI-0K5K`, 10%,
+  estado `ACTIVE`), verificado en la tienda y desactivado después. El flujo
+  completo de `discounts.js` queda probado.
+- Webhook `app/uninstalled` suscrito.
+
+### Lo que está bloqueado: webhooks de pedidos
+
+`orders/create` y `orders/paid` **no se pueden suscribir todavía**:
+
+> This app is not approved to subscribe to webhook topics containing protected
+> customer data.
+
+Los datos de pedidos son datos protegidos de cliente, y Shopify exige aprobación
+previa. Se solicita en Partners → la app → *Solicitudes de acceso a la API* →
+*Acceso a datos de cliente protegidos*.
+
+**Esto bloquea la atribución de ventas**, que es la razón de ser de la app: los
+códigos se crean, pero sin el webhook no llega ningún pedido que atribuir. El
+código que los recibe está escrito y probado contra firmas; lo que falta es el
+permiso.
+
+Una nota sobre el diseño: la app no pide `read_customers` ni guarda nada del
+comprador —solo importe, moneda y código del pedido—, lo cual debería facilitar
+la solicitud.
+
 ## Pendiente
 
 - Probar el ciclo completo contra una tienda de desarrollo. El conector de Shopify

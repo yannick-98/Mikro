@@ -15,7 +15,13 @@ import { formatEuro, formatNumber } from '../lib/format'
 
 const API_KEY = import.meta.env.VITE_SHOPIFY_API_KEY || ''
 
-/** Carga App Bridge una sola vez y espera a que exista window.shopify. */
+/**
+ * Espera a que App Bridge este disponible.
+ *
+ * El script se carga en el head de shopify.html, que es como Shopify exige
+ * cargarlo. Aqui solo se espera a que window.shopify aparezca, porque el
+ * script es sincrono pero el objeto tarda un instante en quedar listo.
+ */
 function useAppBridge() {
   const [estado, setEstado] = useState({ listo: false, error: null })
 
@@ -24,22 +30,8 @@ function useAppBridge() {
       setEstado({ listo: true, error: null })
       return undefined
     }
-    if (!API_KEY) {
-      setEstado({ listo: false, error: 'Falta VITE_SHOPIFY_API_KEY en el entorno.' })
-      return undefined
-    }
-
-    let script = document.querySelector('script[data-mikro-app-bridge]')
-    if (!script) {
-      script = document.createElement('script')
-      script.src = 'https://cdn.shopify.com/shopifycloud/app-bridge.js'
-      script.setAttribute('data-api-key', API_KEY)
-      script.setAttribute('data-mikro-app-bridge', '')
-      document.head.appendChild(script)
-    }
 
     let vivo = true
-    // App Bridge no avisa con un evento: se comprueba hasta que aparece.
     const limite = Date.now() + 8000
     const esperar = () => {
       if (!vivo) return
@@ -47,12 +39,13 @@ function useAppBridge() {
       if (Date.now() > limite) {
         return setEstado({
           listo: false,
-          error: 'Esta pagina tiene que abrirse desde el panel de tu tienda en Shopify.',
+          error: !API_KEY
+            ? 'Falta VITE_SHOPIFY_API_KEY al compilar.'
+            : 'Esta pagina tiene que abrirse desde el panel de tu tienda en Shopify.',
         })
       }
-      setTimeout(esperar, 120)
+      setTimeout(esperar, 100)
     }
-    script.addEventListener('error', () => vivo && setEstado({ listo: false, error: 'No se pudo cargar App Bridge.' }))
     esperar()
 
     return () => {

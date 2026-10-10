@@ -17,6 +17,14 @@ export default defineConfig({
   build: {
     outDir: path.join(here, 'dist'),
     emptyOutDir: true,
+    rollupOptions: {
+      // Dos entradas: la web y la app incrustada en Shopify. La segunda existe
+      // para poder cargar App Bridge en su head sin meterlo en la web publica.
+      input: {
+        main: path.join(here, 'index.html'),
+        shopify: path.join(here, 'shopify.html'),
+      },
+    },
   },
   server: {
     port: 5173,

@@ -30,6 +30,13 @@
   status = 200
   force = true
 
+# La app incrustada tiene su propia entrada HTML, con App Bridge en el head.
+# Va antes del comodin para que no se la coma el index.html de la web.
+[[redirects]]
+  from = "/shopify"
+  to = "/shopify.html"
+  status = 200
+
 # Cualquier otra ruta la resuelve React Router en el cliente.
 [[redirects]]
   from = "/*"
