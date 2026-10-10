@@ -266,6 +266,7 @@ router.post(
         creatorId: z.string().min(1).optional(),
         percentage: z.number().int().min(1).max(60).default(10),
         endsAt: z.string().datetime().optional(),
+        oncePerCustomer: z.boolean().default(false),
       }),
       req.body,
     )
@@ -285,6 +286,7 @@ router.post(
       title: `Mikro · ${campaign.title}${creator ? ` · ${creator.displayName}` : ''}`,
       percentage: data.percentage,
       endsAt: data.endsAt,
+      oncePerCustomer: data.oncePerCustomer,
     })
 
     const attribution = await prisma.shopifyAttribution.create({

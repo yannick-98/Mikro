@@ -49,7 +49,7 @@ export function buildCode(handle, prefix = 'MIKRO') {
 }
 
 /** Crea el descuento en Shopify y devuelve su identificador. */
-export async function createDiscount(shopDomain, { code, title, percentage, startsAt, endsAt }) {
+export async function createDiscount(shopDomain, { code, title, percentage, startsAt, endsAt, oncePerCustomer = false }) {
   const data = await adminGraphql(shopDomain, CREATE, {
     basicCodeDiscount: {
       title: title || `Mikro · ${code}`,
@@ -64,9 +64,14 @@ export async function createDiscount(shopDomain, { code, title, percentage, star
         value: { percentage: percentage / 100 },
         items: { all: true },
       },
-      // Una vez por cliente: el codigo es para que la gente descubra la marca,
-      // no para que un listo se abastezca para el ano.
-      appliesOncePerCustomer: true,
+      // Una vez por cliente solo si la tienda lo pide.
+      //
+      // Estaba puesto por defecto con el argumento de que nadie se abastezca
+      // para el ano. Suena razonable y sale caro: un codigo con limite por
+      // cliente no se puede aplicar a un pedido creado desde el admin, y
+      // obliga a identificar al comprador. Es una restriccion que la tienda no
+      // ha pedido, asi que deja de venir puesta de serie.
+      appliesOncePerCustomer: oncePerCustomer,
     },
   })
 
