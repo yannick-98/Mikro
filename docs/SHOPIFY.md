@@ -184,11 +184,18 @@ Comprobado contra producción:
 | Mismo pedido por `orders/create` y `orders/paid` | Cuenta una sola vez |
 | Panel del comerciante | Muestra la venta en la moneda de la tienda |
 
-La atribución con código se probó enviando a producción un pedido con la forma
-que manda Shopify, firmado con el secreto real. Eso ejercita la ruta completa
-—firma, deduplicación, búsqueda del código, agregados y panel— pero **el pedido
-no lo originó Shopify**. Falta una compra real por la tienda online para cerrar
-también esa parte.
+Cerrado con compras reales por la tienda online, no con payloads fabricados.
+La prueba que vale es esta, con tres pedidos reales en la misma tienda:
+
+| Pedido | Importe | Código | Atribuido |
+|---|---|---|---|
+| `#1001` | 84,85 USD | ninguno | No |
+| `#1002` | 729,95 USD | ninguno | No |
+| `#1003` | 637,46 USD | `MIKRO-MARTAGARCI-T23RB` | **Sí** → Reto 21 días · Marta García |
+
+Que dos pedidos reales con dinero de por medio **no** se atribuyan es tan
+importante como que el tercero sí: significa que el panel no se infla con
+ventas que la campaña no trajo.
 
 ### Dos cosas que salieron de probarlo con las manos
 
