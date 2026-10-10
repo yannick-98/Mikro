@@ -134,7 +134,7 @@
 }
 .landing-aurora-2 {
   inset: 10% -15% -25% 35%;
-  background: radial-gradient(circle, rgba(139, 92, 246, 0.42), transparent 68%);
+  background: radial-gradient(circle, rgba(59, 125, 246, 0.34), transparent 68%);
   animation: landing-drift-b 52s ease-in-out infinite;
 }
 .landing-aurora-3 {
@@ -203,4 +203,8 @@
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-aurora { animation: none; }
 }

@@ -44,6 +44,8 @@ router.get(
           category: true,
           verified: true,
           totalFollowers: true,
+          engagementRate: true,
+          city: true,
           score: true,
           rankDelta: true,
           portfolio: { orderBy: { position: 'asc' }, take: 1, select: { imageUrl: true } },

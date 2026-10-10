@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import clsx from 'clsx'
-import { CalendarCheck, CheckCircle2, Clock3, Loader2, Sparkles, Users2 } from 'lucide-react'
+import { CalendarCheck, CheckCircle2, Clock3, Loader2, Users2 } from 'lucide-react'
 import { api } from '../../api/client'
 
 const AGENDA = [
@@ -56,7 +56,7 @@ const field =
 function Field({ label, error, children, className }) {
   return (
     <label className={clsx('block', className)}>
-      <span className="mb-1 block text-[11.5px] font-bold uppercase tracking-[0.1em] text-white/40">
+      <span className="mb-1 block text-[13px] font-semibold text-white/70">
         {label}
       </span>
       {children}
@@ -119,21 +119,14 @@ export default function DemoFace({ stats }) {
   return (
     <div className="grid w-full items-center gap-10 lg:grid-cols-[1fr_1.02fr] lg:gap-14">
       <div>
-        <span className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/[0.04] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-white/55">
-          <Sparkles size={12} className="text-brand-300" />
-          Demo para empresas
-        </span>
 
-        <h2 className="mt-4 text-[30px] font-black leading-[1.05] tracking-[-0.04em] text-white sm:text-[40px]">
-          Te lo enseñamos con{' '}
-          <span className="bg-gradient-to-r from-brand-400 to-cyan-300 bg-clip-text text-transparent">
-            tu marca delante
-          </span>
+        <h2 className="text-[30px] font-black leading-[1.05] tracking-[-0.04em] text-white sm:text-[40px]">
+          Te lo enseñamos con tu marca delante
         </h2>
 
         <p className="mt-4 max-w-md text-[14.5px] leading-relaxed text-white/55">
           Nada de cuestionarios ni de presupuestos cerrados. Nos cuentas qué vendes y a quién, y en
-          la misma llamada te montamos tu primera campaña con creadores reales de tu zona.
+          la misma llamada te montamos tu primera campaña con creadores de tu zona.
         </p>
 
         <ul className="mt-7 space-y-4">
@@ -156,12 +149,6 @@ export default function DemoFace({ stats }) {
           <span>Respondemos en 24 h laborables</span>
           <span className="hidden sm:inline">·</span>
           <span>Sin compromiso ni tarjeta</span>
-          {stats ? (
-            <>
-              <span className="hidden sm:inline">·</span>
-              <span>{stats.creators} creadores esperando campañas</span>
-            </>
-          ) : null}
         </div>
       </div>
 

@@ -134,6 +134,8 @@ export function landingCreator(creator, position) {
     category: creator.category,
     verified: creator.verified,
     totalFollowers: creator.totalFollowers,
+    engagementRate: creator.engagementRate,
+    city: creator.city,
     score: creator.score,
     rankDelta: creator.rankDelta,
     listPosition: position,
