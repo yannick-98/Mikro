@@ -15,18 +15,18 @@ import Layout from '../components/Layout'
  */
 const TITULAR = {
   // Nombre y apellidos si eres autonomo, razon social si es una sociedad.
-  nombre: '[RAZON SOCIAL O NOMBRE Y APELLIDOS]',
-  nif: '[NIF / CIF]',
+  nombre: 'Yannick Castaño David',
+  nif: '73101843T',
   // Calle, numero, codigo postal, ciudad y provincia.
-  domicilio: '[DOMICILIO COMPLETO]',
+  domicilio: 'C/ Mafamude 6, Puebla de Farnals 46139.',
   // A esta direccion llegaran las peticiones de acceso, rectificacion y
   // borrado. Tiene que ser una que leas.
-  email: '[CORREO DE CONTACTO]',
+  email: 'auttask.media@gmail.com',
   // Solo si eres sociedad: Registro Mercantil, tomo, folio y hoja. Si eres
   // autonomo, pon: 'No aplica (empresario individual)'.
-  registro: '[DATOS REGISTRALES, SI ES SOCIEDAD]',
+  registro: 'No aplica (empresario individual)',
   // Ciudad cuyos juzgados conocen de una disputa. Normalmente la tuya.
-  ciudad: '[CIUDAD]',
+  ciudad: 'Valencia',
 }
 
 const ACTUALIZADO = '10 de octubre de 2026'
