@@ -14,11 +14,19 @@ import Layout from '../components/Layout'
  * TITULAR reune en un solo sitio lo unico que no puede salir del codigo.
  */
 const TITULAR = {
+  // Nombre y apellidos si eres autonomo, razon social si es una sociedad.
   nombre: '[RAZON SOCIAL O NOMBRE Y APELLIDOS]',
   nif: '[NIF / CIF]',
+  // Calle, numero, codigo postal, ciudad y provincia.
   domicilio: '[DOMICILIO COMPLETO]',
+  // A esta direccion llegaran las peticiones de acceso, rectificacion y
+  // borrado. Tiene que ser una que leas.
   email: '[CORREO DE CONTACTO]',
+  // Solo si eres sociedad: Registro Mercantil, tomo, folio y hoja. Si eres
+  // autonomo, pon: 'No aplica (empresario individual)'.
   registro: '[DATOS REGISTRALES, SI ES SOCIEDAD]',
+  // Ciudad cuyos juzgados conocen de una disputa. Normalmente la tuya.
+  ciudad: '[CIUDAD]',
 }
 
 const ACTUALIZADO = '10 de octubre de 2026'
@@ -226,7 +234,7 @@ export function AvisoLegal() {
       <P>
         Estas condiciones se rigen por la legislación española. Para cualquier controversia, y cuando
         la normativa de consumo no imponga otro fuero, las partes se someten a los juzgados y
-        tribunales de <Pendiente>[CIUDAD]</Pendiente>.
+        tribunales de <Pendiente>{TITULAR.ciudad}</Pendiente>.
       </P>
     </Doc>
   )
