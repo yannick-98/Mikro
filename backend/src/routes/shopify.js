@@ -478,8 +478,12 @@ router.post(
     const actualizada = await prisma.shopifyAttribution.update({
       where: { id: attribution.id },
       data: { status: 'ENDED' },
+      include: {
+        creator: { select: { handle: true, displayName: true, avatarUrl: true } },
+        campaign: { select: { title: true } },
+      },
     })
-    res.json({ attribution: actualizada })
+    res.json({ attribution: publicAttribution(actualizada, req.shop) })
   }),
 )
 
