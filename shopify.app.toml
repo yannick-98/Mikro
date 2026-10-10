@@ -14,7 +14,7 @@ embedded = true
 # read_orders para atribuir las ventas, write_discounts para crear el codigo
 # de cada creador y read_products para mostrar el catalogo en el brief.
 # No se piden datos de clientes: Mikro no los necesita.
-scopes = "read_orders,write_discounts,read_products"
+scopes = "read_orders,write_discounts,read_discounts,read_products"
 
 [auth]
 redirect_urls = [

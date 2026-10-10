@@ -73,8 +73,8 @@ export const SHOP_QUERY = `
       email
       myshopifyDomain
       currencyCode
-      billingAddress { countryCodeV2 }
-      plan { displayName }
+      shopAddress { countryCodeV2 }
+      plan { publicDisplayName }
     }
   }
 `

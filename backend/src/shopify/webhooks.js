@@ -14,18 +14,22 @@ const LIST = `
       nodes {
         id
         topic
-        endpoint { ... on WebhookHttpEndpoint { callbackUrl } }
+        uri
       }
     }
   }
 `
 
+// uri y no callbackUrl: callbackUrl esta obsoleto. Y es String, no URL,
+// porque el mismo campo admite destinos que no son HTTP (pubsub://, ARN de
+// EventBridge). Lo confirma el validador del esquema, no la intuicion.
 const CREATE = `
-  mutation suscribir($topic: WebhookSubscriptionTopic!, $callbackUrl: URL!) {
+  mutation suscribir($topic: WebhookSubscriptionTopic!, $uri: String!) {
     webhookSubscriptionCreate(
       topic: $topic
-      webhookSubscription: { callbackUrl: $callbackUrl, format: JSON }
+      webhookSubscription: { uri: $uri, format: JSON }
     ) {
+      webhookSubscription { id topic uri }
       userErrors { field message }
     }
   }
@@ -56,14 +60,14 @@ export async function ensureWebhooks(shopDomain) {
   const data = await adminGraphql(shopDomain, LIST)
   const existentes = new Set(
     (data.webhookSubscriptions?.nodes || [])
-      .filter((n) => n.endpoint?.callbackUrl?.startsWith(base))
+      .filter((n) => typeof n.uri === 'string' && n.uri.startsWith(base))
       .map((n) => n.topic),
   )
 
   const creados = []
   for (const { topic, path } of TOPICS) {
     if (existentes.has(topic)) continue
-    const res = await adminGraphql(shopDomain, CREATE, { topic, callbackUrl: `${base}/${path}` })
+    const res = await adminGraphql(shopDomain, CREATE, { topic, uri: `${base}/${path}` })
     const errores = res.webhookSubscriptionCreate?.userErrors || []
     // Un fallo aqui no debe tumbar la apertura de la app: se anota y se sigue,
     // y el siguiente intento lo vuelve a probar.

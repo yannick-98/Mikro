@@ -113,8 +113,8 @@ router.post(
             name: info.shop.name,
             email: info.shop.email,
             currency: info.shop.currencyCode || 'EUR',
-            countryCode: info.shop.billingAddress?.countryCodeV2 || null,
-            planName: info.shop.plan?.displayName || null,
+            countryCode: info.shop.shopAddress?.countryCodeV2 || null,
+            planName: info.shop.plan?.publicDisplayName || null,
           },
         })
         shop.name = info.shop.name

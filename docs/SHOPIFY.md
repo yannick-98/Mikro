@@ -127,9 +127,34 @@ a una firma inválida.
 Lo que **no** cubren, porque hace falta una tienda de verdad: el canje de tokens, la
 creación del descuento en Shopify y la llegada de un pedido real.
 
+### Validación contra el esquema real
+
+Todas las operaciones de GraphQL están comprobadas contra el esquema de la Admin API
+con el validador del conector de Shopify. Encontró cinco cosas que habrían fallado en
+producción y que ninguna prueba propia podía detectar:
+
+| Lo que tenía | Lo correcto |
+|---|---|
+| `WebhookSubscription.endpoint { callbackUrl }` | `uri` |
+| `WebhookSubscriptionInput.callbackUrl: URL!` | `uri: String!` (admite `pubsub://` y ARN de EventBridge, por eso no es `URL`) |
+| `DiscountCodeBasicInput.customerSelection: { all: true }` | `context: { all: ALL }`, y `all` es un enum, no un booleano |
+| `Shop.billingAddress` | `shopAddress` |
+| `ShopPlan.displayName` | `publicDisplayName` |
+
+El validador también reveló que `discountCodeBasicCreate` necesita `read_discounts`
+además de `write_discounts`. Faltaba en los permisos declarados: la app habría instalado
+bien y fallado al crear el primer código.
+
+Al cambiar de versión de API, lo primero es volver a pasar el validador.
+
 ## Pendiente
 
-- Probar el ciclo completo contra una tienda de desarrollo.
+- Probar el ciclo completo contra una tienda de desarrollo. El conector de Shopify
+  permitirá crear un descuento real y comprobar la forma de `discount_codes` en un
+  pedido de verdad, en cuanto esté autenticado.
+- Crear la app en el Partner Dashboard. **No se puede hacer por API con el conector
+  disponible**: este habla con una tienda (Admin API), y las apps se crean en el Partner
+  Dashboard. Hay que hacerlo a mano.
 - Asignar creador a cada código desde la interfaz: ahora se crea uno por campaña y el
   creador se asocia por API, pero la pantalla todavía no deja elegirlo.
 - Enlace con UTM como apoyo del código: el modelo ya guarda `landingUrl`.

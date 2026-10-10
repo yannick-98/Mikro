@@ -56,7 +56,10 @@ export async function createDiscount(shopDomain, { code, title, percentage, star
       code,
       startsAt: (startsAt || new Date()).toISOString(),
       ...(endsAt ? { endsAt: new Date(endsAt).toISOString() } : {}),
-      customerSelection: { all: true },
+      // context y no customerSelection: este ultimo esta obsoleto. "all: ALL"
+      // significa cualquier comprador, y el valor es un enum (DiscountBuyerSelection),
+      // no un booleano, asi que en las variables viaja como la cadena 'ALL'.
+      context: { all: 'ALL' },
       customerGets: {
         value: { percentage: percentage / 100 },
         items: { all: true },

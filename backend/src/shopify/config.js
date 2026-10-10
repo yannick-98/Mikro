@@ -16,7 +16,7 @@ export const API_VERSION = '2026-10'
  * piden datos de clientes: Mikro no los necesita y pedirlos obligaria a
  * responderlos en las peticiones de acceso del RGPD.
  */
-export const SCOPES = ['read_orders', 'write_discounts', 'read_products']
+export const SCOPES = ['read_orders', 'write_discounts', 'read_discounts', 'read_products']
 
 export const shopifyEnv = () => ({
   apiKey: process.env.SHOPIFY_API_KEY || '',
