@@ -9,6 +9,10 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 // asi que vite se invoca desde alli y aqui se fija su raiz y su salida.
 export default defineConfig({
   root: here,
+  // El .env del proyecto vive en la raiz del repositorio, no en frontend/.
+  // Sin esto, vite busca las variables VITE_* al lado de este fichero y no
+  // las encuentra: la clave publica de Shopify llegaba vacia al compilar.
+  envDir: path.dirname(here),
   plugins: [react()],
   build: {
     outDir: path.join(here, 'dist'),

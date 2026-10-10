@@ -5,6 +5,9 @@
 #
 #   shopify app config push   para subirlo al Partner Dashboard.
 
+# client_id es publico: es el que viaja al navegador en la app incrustada.
+# El secreto no esta aqui ni puede estarlo; vive en el entorno.
+client_id = "f554870cbdee11a6bac8f1ae5571d6e0"
 name = "Mikro"
 handle = "mikro"
 application_url = "https://mikro-marketplace.netlify.app/shopify"
