@@ -44,6 +44,7 @@ const CREATE = `
 export const TOPICS = [
   { topic: 'ORDERS_CREATE', path: 'orders-create' },
   { topic: 'ORDERS_PAID', path: 'orders-paid' },
+  { topic: 'REFUNDS_CREATE', path: 'refunds-create' },
   { topic: 'APP_UNINSTALLED', path: 'app-uninstalled' },
 ]
 

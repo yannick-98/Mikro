@@ -8,14 +8,14 @@ import { Router } from 'express'
 import { z } from 'zod'
 import jwt from 'jsonwebtoken'
 import { prisma } from '../lib/prisma.js'
-import { asyncHandler, badRequest, forbidden, notFound, parseBody, unauthorized } from '../lib/http.js'
+import { asyncHandler, badRequest, conflict, forbidden, notFound, parseBody, unauthorized } from '../lib/http.js'
 import { verifyPassword } from '../lib/auth.js'
 import { shopifyConfigured, toShopDomain } from '../shopify/config.js'
 import { verifySessionToken } from '../shopify/verify.js'
 import { exchangeSessionToken } from '../shopify/tokens.js'
 import { adminGraphql, SHOP_QUERY } from '../shopify/admin.js'
 import { ensureWebhooks } from '../shopify/webhooks.js'
-import { buildCode, createDiscount, deactivateDiscount } from '../shopify/discounts.js'
+import { buildCode, createDiscount, deactivateDiscount, normalizeCode } from '../shopify/discounts.js'
 
 const router = Router()
 
@@ -185,6 +185,48 @@ router.post(
 // Panel
 // ---------------------------------------------------------------------------
 
+/**
+ * Creadores de una campana.
+ *
+ * Primero quienes ya colaboran, despues quienes se han postulado. Dar a elegir
+ * entre los 75 creadores del catalogo no ayudaria: el codigo es para quien va
+ * a publicar algo.
+ */
+router.get(
+  '/campaigns/:id/creators',
+  requireShop,
+  requireLinked,
+  asyncHandler(async (req, res) => {
+    const campaign = await prisma.campaign.findUnique({ where: { id: req.params.id } })
+    if (!campaign || campaign.brandId !== req.shop.brandId) throw notFound('Esa campana no es de esta tienda')
+
+    const seleccion = { id: true, handle: true, displayName: true, avatarUrl: true, category: true }
+    const [deals, applications] = await Promise.all([
+      prisma.deal.findMany({ where: { campaignId: campaign.id }, include: { creator: { select: seleccion } } }),
+      prisma.application.findMany({
+        where: { campaignId: campaign.id, status: { in: ['PENDING', 'ACCEPTED'] } },
+        include: { creator: { select: seleccion } },
+      }),
+    ])
+
+    const vistos = new Set()
+    const items = []
+    for (const d of deals) {
+      if (d.creator && !vistos.has(d.creator.id)) {
+        vistos.add(d.creator.id)
+        items.push({ ...d.creator, relacion: 'colabora' })
+      }
+    }
+    for (const a of applications) {
+      if (a.creator && !vistos.has(a.creator.id)) {
+        vistos.add(a.creator.id)
+        items.push({ ...a.creator, relacion: 'candidatura' })
+      }
+    }
+    res.json({ items })
+  }),
+)
+
 /** Lo que ve la tienda al abrir la app: campanas, codigos y ventas. */
 router.get(
   '/overview',
@@ -217,6 +259,8 @@ router.get(
         status: a.status,
         ordersCount: a.ordersCount,
         salesTotal: a.salesTotal,
+        refundedTotal: a.refundedTotal,
+        netTotal: a.salesTotal - a.refundedTotal,
         creator: a.creator,
       })
       porCampana.set(a.campaignId, lista)
@@ -237,12 +281,16 @@ router.get(
           attributions: codigos,
           ordersCount: codigos.reduce((s, a) => s + a.ordersCount, 0),
           salesTotal: codigos.reduce((s, a) => s + a.salesTotal, 0),
+          refundedTotal: codigos.reduce((s, a) => s + a.refundedTotal, 0),
+          netTotal: codigos.reduce((s, a) => s + a.netTotal, 0),
         }
       }),
       totals: {
         currency: shop.currency,
         ordersCount: attributions.reduce((s, a) => s + a.ordersCount, 0),
         salesTotal: attributions.reduce((s, a) => s + a.salesTotal, 0),
+        refundedTotal: attributions.reduce((s, a) => s + a.refundedTotal, 0),
+        netTotal: attributions.reduce((s, a) => s + a.salesTotal - a.refundedTotal, 0),
         activeCodes: attributions.filter((a) => a.status === 'ACTIVE').length,
       },
     })
@@ -265,6 +313,7 @@ router.post(
         campaignId: z.string().min(1),
         creatorId: z.string().min(1).optional(),
         percentage: z.number().int().min(1).max(60).default(10),
+        code: z.string().trim().max(40).optional(),
         endsAt: z.string().datetime().optional(),
         oncePerCustomer: z.boolean().default(false),
       }),
@@ -279,7 +328,16 @@ router.post(
       : null
     if (data.creatorId && !creator) throw notFound('Ese creador no existe')
 
-    const code = buildCode(creator?.handle || campaign.title)
+    // Si la tienda escribe su propio codigo, manda el suyo; si no, se genera.
+    const code = data.code ? normalizeCode(data.code) : buildCode(creator?.handle || campaign.title)
+    if (data.code && code.length < 3) throw badRequest('El codigo necesita al menos 3 letras o numeros')
+
+    // Dos codigos iguales en la misma tienda romperian la atribucion: el
+    // webhook no sabria a cual de las dos colaboraciones apuntar la venta.
+    const repetido = await prisma.shopifyAttribution.findFirst({
+      where: { shopId: req.shop.id, code },
+    })
+    if (repetido) throw conflict(`El codigo ${code} ya esta en uso en esta tienda`)
 
     const discountGid = await createDiscount(req.shop.domain, {
       code,

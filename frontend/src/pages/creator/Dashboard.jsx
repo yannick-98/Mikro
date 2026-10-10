@@ -5,7 +5,7 @@ import { api } from '../../api/client'
 import { useAuth } from '../../store/auth'
 import { DashboardShell, StatCard } from '../../components/Dashboard'
 import { Delta, EmptyState, Spinner, useAsync } from '../../components/ui'
-import { formatEuro, formatFollowers, formatPercent } from '../../lib/format'
+import { formatEuro, formatFollowers, formatMoney, formatPercent } from '../../lib/format'
 import { CREATOR_NAV } from './nav'
 
 export default function CreatorDashboard() {
@@ -70,6 +70,52 @@ export default function CreatorDashboard() {
             accent="bg-violet-50 text-violet-600"
           />
         </div>
+
+        {/* Lo que han vendido sus codigos. Para un creador esto no es una
+            metrica mas: es el argumento con el que pedir mas la proxima vez. */}
+        {data.ventasShopify ? (
+          <section className="card p-6">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <h2 className="text-[16px] font-extrabold tracking-tight">Ventas que has generado</h2>
+                <p className="mt-1 text-[13.5px] text-ink/55">
+                  Lo que han comprado con tus codigos de descuento.
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-[26px] font-black leading-none tabular-nums text-emerald-600">
+                  {formatMoney(data.ventasShopify.netTotal, data.ventasShopify.currency)}
+                </p>
+                <p className="mt-1 text-[12.5px] font-semibold text-ink/45">
+                  {data.ventasShopify.ordersCount} pedidos
+                  {data.ventasShopify.refundedTotal
+                    ? ` · ${formatMoney(data.ventasShopify.refundedTotal, data.ventasShopify.currency)} devueltos`
+                    : ''}
+                </p>
+              </div>
+            </div>
+
+            {data.ventasShopify.codes.length ? (
+              <ul className="mt-4 space-y-2 border-t border-black/[0.06] pt-4">
+                {data.ventasShopify.codes.map((c) => (
+                  <li key={c.code} className="flex flex-wrap items-center gap-2.5 text-[13px]">
+                    <span className="rounded-lg bg-black/[0.05] px-2 py-1 font-mono text-[12.5px] font-bold">
+                      {c.code}
+                    </span>
+                    <span className="text-ink/60">{c.campaign || 'sin campana'}</span>
+                    <span className="ml-auto font-bold tabular-nums">
+                      {c.ordersCount} ped. · {formatMoney(c.netTotal, data.ventasShopify.currency)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-4 border-t border-black/[0.06] pt-4 text-[13.5px] text-ink/45">
+                Tienes codigos activos pero todavia nadie los ha usado.
+              </p>
+            )}
+          </section>
+        ) : null}
 
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
           <div className="space-y-5">

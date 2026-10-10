@@ -140,6 +140,73 @@ const onOrder = webhook(async ({ shopDomain, payload }) => {
 router.post('/orders-create', onOrder)
 router.post('/orders-paid', onOrder)
 
+/**
+ * Devolucion sobre un pedido atribuido.
+ *
+ * Sin esto, un pedido devuelto seguia contando como venta y el panel le
+ * atribuia a un creador dinero que la tienda ha tenido que reintegrar. Es el
+ * peor error posible en una cifra que sirve para decidir a quien se paga.
+ *
+ * Lo devuelto no se resta de salesTotal: se guarda aparte. Restarlo escondria
+ * que hubo una venta y una devolucion, y esas dos cosas no son lo mismo que
+ * no haber vendido.
+ */
+const onRefund = webhook(async ({ shopDomain, payload }) => {
+  const shop = await prisma.shopifyShop.findUnique({ where: { domain: shopDomain } })
+  if (!shop) return
+
+  const orderGid = payload.order_id
+    ? `gid://shopify/Order/${payload.order_id}`
+    : payload.order?.admin_graphql_api_id
+  if (!orderGid) return
+
+  // Solo interesan las devoluciones de pedidos que atribuimos a alguien.
+  const order = await prisma.shopifyOrder.findUnique({
+    where: { shopId_orderGid: { shopId: shop.id, orderGid } },
+  })
+  if (!order || !order.attributionId) return
+
+  // El importe sale de las transacciones efectivamente devueltas. Las lineas
+  // del pedido dicen que se devolvio, pero no cuanto dinero salio de caja.
+  const transacciones = (payload.transactions || []).filter(
+    (t) => t.kind === 'refund' && t.status === 'success',
+  )
+  const importe = transacciones.reduce((suma, t) => suma + (Number(t.amount) || 0), 0)
+  if (importe <= 0) return
+
+  const refundGid = payload.admin_graphql_api_id || `gid://shopify/Refund/${payload.id}`
+
+  // La devolucion se registra con clave unica propia: un pedido admite varias
+  // parciales, y un reintento del webhook no debe restar dos veces.
+  try {
+    await prisma.$transaction([
+      prisma.shopifyRefund.create({
+        data: {
+          shopId: shop.id,
+          orderId: order.id,
+          refundGid,
+          amount: importe,
+          currency: payload.transactions?.[0]?.currency || order.currency,
+        },
+      }),
+      prisma.shopifyOrder.update({
+        where: { id: order.id },
+        data: { refundedTotal: { increment: importe } },
+      }),
+      prisma.shopifyAttribution.update({
+        where: { id: order.attributionId },
+        data: { refundedTotal: { increment: importe } },
+      }),
+    ])
+  } catch (e) {
+    // P2002: esta devolucion ya estaba registrada. Es el caso normal de un
+    // reintento, no un fallo.
+    if (e?.code !== 'P2002') throw e
+  }
+})
+
+router.post('/refunds-create', onRefund)
+
 /** La tienda ha desinstalado: el token deja de valer, hay que soltarlo. */
 router.post(
   '/app-uninstalled',

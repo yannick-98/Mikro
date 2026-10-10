@@ -33,6 +33,23 @@ const DEACTIVATE = `
  * sufijo aleatorio detras para que nadie lo acierte por probar. Sin vocales en
  * el alfabeto del sufijo: asi no sale ninguna palabra desafortunada por azar.
  */
+/**
+ * Limpia un codigo escrito a mano.
+ *
+ * Shopify acepta casi cualquier cosa, pero un codigo con espacios o acentos
+ * es un codigo que el seguidor teclea mal y una venta que nadie atribuye.
+ */
+export function normalizeCode(value) {
+  return (value || '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9-]/g, '')
+    .replace(/-{2,}/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 40)
+}
+
 export function buildCode(handle, prefix = 'MIKRO') {
   const base = (handle || 'creador')
     .normalize('NFD')

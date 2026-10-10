@@ -110,8 +110,33 @@ router.get(
     ]
     const completion = Math.round((checks.filter((c) => c.done).length / checks.length) * 100)
 
+    // Lo que han vendido sus codigos de Shopify. Para un creador esto no es
+    // una metrica mas: es el argumento con el que pedir mas en la siguiente.
+    const codigos = await prisma.shopifyAttribution.findMany({
+      where: { creatorId },
+      include: { shop: { select: { currency: true } }, campaign: { select: { title: true } } },
+      orderBy: { createdAt: 'desc' },
+    })
+    const conVentas = codigos.filter((a) => a.ordersCount > 0)
+    const ventasShopify = codigos.length
+      ? {
+          currency: codigos[0].shop?.currency || 'EUR',
+          ordersCount: codigos.reduce((s, a) => s + a.ordersCount, 0),
+          salesTotal: codigos.reduce((s, a) => s + a.salesTotal, 0),
+          refundedTotal: codigos.reduce((s, a) => s + a.refundedTotal, 0),
+          netTotal: codigos.reduce((s, a) => s + a.salesTotal - a.refundedTotal, 0),
+          codes: conVentas.map((a) => ({
+            code: a.code,
+            campaign: a.campaign?.title || null,
+            ordersCount: a.ordersCount,
+            netTotal: a.salesTotal - a.refundedTotal,
+          })),
+        }
+      : null
+
     res.json({
       creator: publicCreator(creator),
+      ventasShopify,
       stats: {
         rankPosition: creator.rankPosition,
         rankDelta: creator.rankDelta,

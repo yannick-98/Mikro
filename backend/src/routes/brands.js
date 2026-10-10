@@ -101,6 +101,11 @@ router.get(
     const creators = await prisma.creator.findMany({ where: { id: { in: creatorIds } } })
     const reach = creators.reduce((sum, c) => sum + c.totalFollowers, 0)
 
+    // Ventas de Shopify atribuidas a las campanas de esta empresa, si tiene
+    // tienda conectada. Es la unica cifra del panel que mide dinero entrante
+    // y no gastado, asi que merece estar aqui y no escondida en Shopify.
+    const shopifySales = await resumenShopify(req.user.brand.id)
+
     res.json({
       stats: {
         openCampaigns: campaigns.filter((c) => c.status === 'OPEN').length,
@@ -113,6 +118,7 @@ router.get(
         reach,
         avgCost: completed > 0 ? Math.round(invested / Math.max(completed, 1)) : 0,
       },
+      shopifySales,
       campaigns: campaigns.slice(0, 5).map((c) => ({
         id: c.id,
         title: c.title,
@@ -127,5 +133,29 @@ router.get(
     })
   }),
 )
+
+/**
+ * Ventas atribuidas por la app de Shopify.
+ *
+ * Devuelve null cuando la empresa no tiene tienda conectada, para que el panel
+ * pueda distinguir "no hay tienda" de "hay tienda y cero ventas".
+ */
+async function resumenShopify(brandId) {
+  const shop = await prisma.shopifyShop.findUnique({ where: { brandId } })
+  if (!shop || shop.uninstalledAt) return null
+
+  const atribuciones = await prisma.shopifyAttribution.findMany({ where: { shopId: shop.id } })
+  const bruto = atribuciones.reduce((s, a) => s + a.salesTotal, 0)
+  const devuelto = atribuciones.reduce((s, a) => s + a.refundedTotal, 0)
+  return {
+    domain: shop.domain,
+    currency: shop.currency,
+    ordersCount: atribuciones.reduce((s, a) => s + a.ordersCount, 0),
+    salesTotal: bruto,
+    refundedTotal: devuelto,
+    netTotal: bruto - devuelto,
+    activeCodes: atribuciones.filter((a) => a.status === 'ACTIVE').length,
+  }
+}
 
 export default router

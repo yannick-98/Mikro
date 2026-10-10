@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import clsx from 'clsx'
-import { Check, Copy, Link2, Loader2, Plus, Store, TrendingUp } from 'lucide-react'
+import { Check, Copy, Link2, Loader2, Plus, RotateCcw, Store, TrendingUp, X } from 'lucide-react'
 import { Spinner } from '../components/ui'
 import { formatMoney, formatNumber } from '../lib/format'
 
@@ -55,6 +55,10 @@ function useAppBridge() {
 
   return estado
 }
+
+const campo =
+  'w-full rounded-lg border border-black/15 bg-white px-3 py-2 text-[13.5px] font-semibold text-ink outline-none transition focus:border-brand-500'
+const etiqueta = 'mb-1 block text-[11px] font-bold uppercase tracking-[0.08em] text-ink/40'
 
 function Boton({ children, className, loading, ...rest }) {
   return (
@@ -166,6 +170,7 @@ export default function ShopifyApp() {
   const [error, setError] = useState(null)
   const [errorVinculo, setErrorVinculo] = useState(null)
   const [creando, setCreando] = useState(null)
+  const [formulario, setFormulario] = useState(null) // campana con el formulario abierto
 
   /**
    * Llama al API con un token recien pedido.
@@ -237,13 +242,17 @@ export default function ShopifyApp() {
     }
   }
 
-  const crearCodigo = async (campaignId) => {
+  const crearCodigo = async (campaignId, datosFormulario) => {
     setCreando(campaignId)
+    setError(null)
     try {
-      await llamar('/attributions', { method: 'POST', body: { campaignId, percentage: 10 } })
+      await llamar('/attributions', { method: 'POST', body: { campaignId, ...datosFormulario } })
+      setFormulario(null)
       await cargar()
+      return true
     } catch (e) {
       setError(e.message)
+      return false
     } finally {
       setCreando(null)
     }
@@ -291,8 +300,12 @@ export default function ShopifyApp() {
         <Cifra
           icono={TrendingUp}
           label="Ventas atribuidas"
-          valor={totals ? money(totals.salesTotal) : '—'}
-          sub="con códigos de Mikro"
+          valor={totals ? money(totals.netTotal) : '—'}
+          sub={
+            totals?.refundedTotal
+              ? `${money(totals.salesTotal)} menos ${money(totals.refundedTotal)} devueltos`
+              : 'con códigos de Mikro'
+          }
         />
         <Cifra label="Pedidos" valor={totals ? formatNumber(totals.ordersCount) : '—'} sub="desde colaboraciones" />
         <Cifra label="Códigos activos" valor={totals ? formatNumber(totals.activeCodes) : '—'} sub="uno por creador" />
@@ -331,24 +344,52 @@ export default function ShopifyApp() {
                   </div>
                   <div className="flex items-center gap-4">
                     <div className="text-right">
-                      <p className="text-[15px] font-black tabular-nums">{money(c.salesTotal)}</p>
-                      <p className="text-[11.5px] font-semibold text-ink/45">{c.ordersCount} pedidos</p>
+                      <p className="text-[15px] font-black tabular-nums">{money(c.netTotal)}</p>
+                      <p className="text-[11.5px] font-semibold text-ink/45">
+                        {c.ordersCount} pedidos
+                        {c.refundedTotal ? ` · ${money(c.refundedTotal)} devueltos` : ''}
+                      </p>
                     </div>
-                    <Boton onClick={() => crearCodigo(c.id)} loading={creando === c.id}>
-                      <Plus size={14} /> Código
+                    <Boton
+                      onClick={() => setFormulario(formulario === c.id ? null : c.id)}
+                      className={
+                        formulario === c.id
+                          ? 'bg-black/[0.06] text-ink hover:bg-black/10'
+                          : undefined
+                      }
+                    >
+                      {formulario === c.id ? <X size={14} /> : <Plus size={14} />}
+                      {formulario === c.id ? 'Cancelar' : 'Código'}
                     </Boton>
                   </div>
                 </div>
 
+                {formulario === c.id ? (
+                  <FormularioCodigo
+                    campaign={c}
+                    llamar={llamar}
+                    creando={creando === c.id}
+                    onCrear={(datos) => crearCodigo(c.id, datos)}
+                  />
+                ) : null}
+
                 {c.attributions.length ? (
-                  <ul className="mt-3 flex flex-wrap gap-2 border-t border-black/[0.05] pt-3">
+                  <ul className="mt-3 space-y-1.5 border-t border-black/[0.05] pt-3">
                     {c.attributions.map((a) => (
-                      <li key={a.id} className="flex items-center gap-2 text-[12.5px] text-ink/60">
+                      <li key={a.id} className="flex flex-wrap items-center gap-2 text-[12.5px] text-ink/60">
                         <Codigo code={a.code} />
+                        <span className="rounded bg-black/[0.05] px-1.5 py-0.5 font-bold">
+                          {a.percentage}%
+                        </span>
                         <span>
                           {a.creator?.displayName || 'sin asignar'} · {a.ordersCount} ped. ·{' '}
-                          {money(a.salesTotal)}
+                          {money(a.netTotal)}
                         </span>
+                        {a.refundedTotal ? (
+                          <span className="inline-flex items-center gap-1 text-rose-600">
+                            <RotateCcw size={11} /> {money(a.refundedTotal)} devueltos
+                          </span>
+                        ) : null}
                       </li>
                     ))}
                   </ul>
@@ -359,6 +400,131 @@ export default function ShopifyApp() {
         )}
       </section>
     </Marco>
+  )
+}
+
+/**
+ * Formulario para dar de alta un codigo.
+ *
+ * Tres decisiones: a quien, cuanto descuenta y como se llama el codigo. El
+ * nombre se propone a partir del creador elegido, pero se puede escribir: hay
+ * marcas que ya tienen una convencion y obligarlas a la nuestra seria absurdo.
+ */
+function FormularioCodigo({ campaign, llamar, creando, onCrear }) {
+  const [creadores, setCreadores] = useState(null)
+  const [creatorId, setCreatorId] = useState('')
+  const [percentage, setPercentage] = useState(10)
+  const [code, setCode] = useState('')
+  const [tocado, setTocado] = useState(false)
+
+  useEffect(() => {
+    let vivo = true
+    llamar(`/campaigns/${campaign.id}/creators`)
+      .then((r) => vivo && setCreadores(r.items || []))
+      .catch(() => vivo && setCreadores([]))
+    return () => {
+      vivo = false
+    }
+  }, [campaign.id, llamar])
+
+  // El codigo propuesto sigue al creador elegido mientras nadie lo haya
+  // escrito a mano. En cuanto lo tocas, manda lo que tu pongas.
+  const elegido = creadores?.find((c) => c.id === creatorId)
+  const sugerido = `MIKRO-${(elegido?.handle || campaign.title)
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '')
+    .slice(0, 10)}`
+
+  const limpiar = (v) =>
+    v
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .toUpperCase()
+      .replace(/[^A-Z0-9-]/g, '')
+      .slice(0, 40)
+
+  const valor = tocado ? code : sugerido
+
+  return (
+    <form
+      className="mt-3 rounded-xl border border-black/[0.08] bg-black/[0.02] p-4"
+      onSubmit={async (e) => {
+        e.preventDefault()
+        const ok = await onCrear({
+          creatorId: creatorId || undefined,
+          percentage: Number(percentage),
+          code: valor || undefined,
+        })
+        if (ok) {
+          setCreatorId('')
+          setCode('')
+          setTocado(false)
+        }
+      }}
+    >
+      <div className="grid gap-3 sm:grid-cols-[1.3fr_auto_1.3fr_auto]">
+        <label className="block">
+          <span className={etiqueta}>Creador</span>
+          <select
+            className={campo}
+            value={creatorId}
+            onChange={(e) => setCreatorId(e.target.value)}
+            disabled={!creadores}
+          >
+            <option value="">{creadores ? 'Sin asignar' : 'Cargando…'}</option>
+            {(creadores || []).map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.displayName} · {c.relacion === 'colabora' ? 'colabora' : 'candidatura'}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="block">
+          <span className={etiqueta}>Descuento</span>
+          <div className="relative">
+            <input
+              type="number"
+              min={1}
+              max={60}
+              value={percentage}
+              onChange={(e) => setPercentage(e.target.value)}
+              className={clsx(campo, 'w-[92px] pr-7 tabular-nums')}
+            />
+            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[13px] font-bold text-ink/40">
+              %
+            </span>
+          </div>
+        </label>
+
+        <label className="block">
+          <span className={etiqueta}>Código</span>
+          <input
+            value={valor}
+            onChange={(e) => {
+              setTocado(true)
+              setCode(limpiar(e.target.value))
+            }}
+            placeholder={sugerido}
+            className={clsx(campo, 'font-mono tracking-tight')}
+          />
+        </label>
+
+        <div className="flex items-end">
+          <Boton type="submit" loading={creando} className="bg-brand-600 text-white hover:bg-brand-700">
+            Crear código
+          </Boton>
+        </div>
+      </div>
+
+      <p className="mt-2.5 text-[12px] text-ink/45">
+        {creadores && !creadores.length
+          ? 'Nadie se ha postulado todavía a esta campaña: puedes crear el código igual y asignarlo después.'
+          : 'Se crea en tu tienda al instante. Solo letras, números y guiones.'}
+      </p>
+    </form>
   )
 }
 

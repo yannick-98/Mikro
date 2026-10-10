@@ -236,6 +236,55 @@ Una nota sobre el diseño: la app no pide `read_customers` ni guarda nada del
 comprador —solo importe, moneda y código del pedido—, lo cual debería facilitar
 la solicitud.
 
+## Devoluciones
+
+Un pedido devuelto ya no cuenta como venta. La app se suscribe a
+`refunds/create` y **resta lo devuelto, pero no lo borra**: `salesTotal` sigue
+siendo el bruto y `refundedTotal` guarda aparte lo reintegrado. Restarlo sin
+más escondería que hubo una venta y una devolución, y eso no es lo mismo que
+no haber vendido.
+
+El importe sale de las transacciones efectivamente devueltas, no de las líneas
+del pedido: las líneas dicen qué se devolvió, no cuánto dinero salió de caja.
+
+Probado con una devolución parcial real sobre el pedido `#1003`:
+
+| | |
+|---|---|
+| Venta bruta | 637,46 USD |
+| Devuelto | 200,00 USD |
+| **Neto en el panel** | **437,46 USD** |
+
+Y el reenvío del mismo reembolso con otro id de webhook no vuelve a restar: la
+tabla `ShopifyRefund` tiene clave única por devolución, igual que los pedidos
+la tienen por `orderGid`.
+
+## Crear un código desde la interfaz
+
+El formulario de cada campaña pide tres cosas:
+
+- **Creador.** Se ofrecen quienes ya colaboran y quienes se han postulado, en
+  ese orden. Dar a elegir entre todo el catálogo no ayudaría: el código es para
+  quien va a publicar algo.
+- **Descuento**, del 1 al 60 %.
+- **Código.** Se propone a partir del creador elegido y cambia solo mientras
+  nadie lo escriba a mano; en cuanto se toca, manda lo que escriba la tienda.
+  Se normaliza en vivo (mayúsculas, sin acentos, solo letras, números y
+  guiones) porque un código con un espacio es una venta que nadie atribuye.
+
+Dos códigos iguales en la misma tienda se rechazan: el webhook no sabría a cuál
+de las dos colaboraciones apuntar la venta.
+
+## Las ventas en el panel de Mikro
+
+No solo en Shopify:
+
+- **Empresa:** las ventas atribuidas aparecen en su panel. Es la única cifra
+  que mide dinero que entra, no que sale.
+- **Creador:** ve lo que han vendido sus códigos, desglosado por campaña. Para
+  un creador eso no es una métrica más: es el argumento con el que pedir más
+  en la siguiente colaboración.
+
 ## Pendiente
 
 - Probar el ciclo completo contra una tienda de desarrollo. El conector de Shopify
@@ -247,7 +296,4 @@ la solicitud.
 - Asignar creador a cada código desde la interfaz: ahora se crea uno por campaña y el
   creador se asocia por API, pero la pantalla todavía no deja elegirlo.
 - Enlace con UTM como apoyo del código: el modelo ya guarda `landingUrl`.
-- Devolver las ventas atribuidas al panel de Mikro, no solo al de Shopify.
-- Reembolsos: un pedido devuelto sigue contando como venta. Hace falta
-  `refunds/create` para descontarlo.
 - Facturación por la App Store si algún día la app deja de ser gratuita.

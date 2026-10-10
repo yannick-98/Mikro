@@ -379,8 +379,11 @@ model ShopifyAttribution {
   endsAt          DateTime?
 
   // Agregados: evitan recorrer todos los pedidos para pintar un panel.
-  ordersCount Int   @default(0)
-  salesTotal  Float @default(0)
+  // salesTotal es bruto; lo devuelto se guarda aparte para poder enseniar las
+  // dos cifras. Restarlo sin mas escondria que hubo una venta y una devolucion.
+  ordersCount    Int   @default(0)
+  salesTotal     Float @default(0)
+  refundedTotal  Float @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -401,17 +404,39 @@ model ShopifyOrder {
   attributionId String?
   attribution   ShopifyAttribution? @relation(fields: [attributionId], references: [id], onDelete: SetNull)
 
-  orderGid    String
-  orderNumber String?
-  totalPrice  Float
-  currency    String   @default("EUR")
-  discountCode String?
+  orderGid      String
+  orderNumber   String?
+  totalPrice    Float
+  refundedTotal Float    @default(0)
+  currency      String   @default("EUR")
+  discountCode  String?
   processedAt DateTime @default(now())
   createdAt   DateTime @default(now())
+
+  refunds ShopifyRefund[]
 
   // El mismo pedido puede llegar varias veces: Shopify entrega al menos una vez.
   @@unique([shopId, orderGid])
   @@index([attributionId])
+}
+
+// Una devolucion sobre un pedido atribuido.
+//
+// Existe como tabla propia y no como un campo del pedido porque un pedido
+// admite varias devoluciones parciales, y porque hace falta una clave unica
+// por devolucion: sin ella, un reintento del webhook restaria dos veces.
+model ShopifyRefund {
+  id        String       @id @default(cuid())
+  shopId    String
+  orderId   String
+  order     ShopifyOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  refundGid String
+  amount    Float
+  currency  String       @default("EUR")
+  createdAt DateTime     @default(now())
+
+  @@unique([shopId, refundGid])
+  @@index([orderId])
 }
 
 // Registro de webhooks ya procesados.

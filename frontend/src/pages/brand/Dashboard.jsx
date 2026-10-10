@@ -5,7 +5,7 @@ import { useAuth } from '../../store/auth'
 import { DashboardShell, StatCard, StatusPill } from '../../components/Dashboard'
 import { CreatorMini } from '../../components/CreatorRow'
 import { EmptyState, Spinner, useAsync } from '../../components/ui'
-import { CAMPAIGN_STATUS, formatEuro, formatFollowers, formatNumber } from '../../lib/format'
+import { CAMPAIGN_STATUS, formatEuro, formatFollowers, formatMoney, formatNumber } from '../../lib/format'
 import { BRAND_NAV } from './nav'
 
 export default function BrandDashboard() {
@@ -64,6 +64,33 @@ export default function BrandDashboard() {
               accent="bg-emerald-50 text-emerald-600"
             />
           </div>
+
+          {/* Ventas de la tienda atribuidas a las campanas. Es la unica cifra
+              del panel que mide dinero que entra, no que sale. */}
+          {data.shopifySales ? (
+            <section className="card flex flex-wrap items-center justify-between gap-5 p-6">
+              <div>
+                <p className="text-[11.5px] font-bold uppercase tracking-[0.1em] text-ink/40">
+                  Ventas generadas en tu tienda
+                </p>
+                <p className="mt-1.5 text-[28px] font-black leading-none tabular-nums text-emerald-600">
+                  {formatMoney(data.shopifySales.netTotal, data.shopifySales.currency)}
+                </p>
+                <p className="mt-1.5 text-[13px] text-ink/55">
+                  {data.shopifySales.ordersCount} pedidos con códigos de Mikro
+                  {data.shopifySales.refundedTotal
+                    ? ` · ${formatMoney(data.shopifySales.refundedTotal, data.shopifySales.currency)} devueltos`
+                    : ''}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-[12.5px] font-semibold text-ink/45">{data.shopifySales.domain}</p>
+                <p className="mt-0.5 text-[12.5px] text-ink/45">
+                  {data.shopifySales.activeCodes} códigos activos
+                </p>
+              </div>
+            </section>
+          ) : null}
 
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
             <section className="card p-6">
