@@ -164,7 +164,52 @@ Funciona de punta a punta:
   completo de `discounts.js` queda probado.
 - Webhook `app/uninstalled` suscrito.
 
-### Lo que está bloqueado: webhooks de pedidos
+### Atribución de ventas: probada en producción
+
+Desbloqueada. La clave: el **paso 1** del formulario de datos protegidos
+(Partners → la app → *Solicitudes de acceso a la API*) ya da acceso en
+desarrollo con solo seleccionar el uso; la revisión formal solo la exige la App
+Store. Declarado **«Informes y estadísticas»**, y los campos opcionales de
+nombre, correo, teléfono y dirección **sin marcar**, porque la app no los usa.
+
+Con eso, `ORDERS_CREATE` y `ORDERS_PAID` se suscriben sin problema.
+
+Comprobado contra producción:
+
+| Qué | Resultado |
+|---|---|
+| Pedido real sin código de Mikro | Los dos webhooks llegan, pasan la firma, no atribuyen nada |
+| Pedido con código | Atribuido: 1 pedido, 84,85 USD a la campaña y a la creadora |
+| Mismo webhook dos veces | El segundo se descarta por id |
+| Mismo pedido por `orders/create` y `orders/paid` | Cuenta una sola vez |
+| Panel del comerciante | Muestra la venta en la moneda de la tienda |
+
+La atribución con código se probó enviando a producción un pedido con la forma
+que manda Shopify, firmado con el secreto real. Eso ejercita la ruta completa
+—firma, deduplicación, búsqueda del código, agregados y panel— pero **el pedido
+no lo originó Shopify**. Falta una compra real por la tienda online para cerrar
+también esa parte.
+
+### Dos cosas que salieron de probarlo con las manos
+
+**El límite por cliente.** Los códigos se creaban con
+`appliesOncePerCustomer: true`, razonando que nadie debía abastecerse para el
+año. Un código así **no se puede aplicar a un pedido creado desde el admin** y
+obliga a identificar al comprador. Es una restricción que la tienda no pidió:
+ahora es opcional y por defecto no se aplica.
+
+**La moneda.** El panel mostraba «85 €» para una venta de 84,85 USD: el
+formateador estaba fijado a euros y además redondeaba. Mikro cobra en euros,
+pero la tienda vende en la suya. Ahora cada importe se muestra en la moneda de
+la tienda y con sus céntimos.
+
+### Nota sobre el buscador de descuentos del admin
+
+Al aplicar un código a un pedido desde el admin, el buscador va **por título**,
+no por código. Por eso conviene que el título diga algo reconocible: se genera
+como `Mikro · <campaña> · <creador>`.
+
+### Lo que estaba bloqueado: webhooks de pedidos
 
 `orders/create` y `orders/paid` **no se pueden suscribir todavía**:
 

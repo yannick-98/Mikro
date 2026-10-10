@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import clsx from 'clsx'
 import { Check, Copy, Link2, Loader2, Plus, Store, TrendingUp } from 'lucide-react'
 import { Spinner } from '../components/ui'
-import { formatEuro, formatNumber } from '../lib/format'
+import { formatMoney, formatNumber } from '../lib/format'
 
 /**
  * La app de Mikro dentro del admin de Shopify.
@@ -282,6 +282,8 @@ export default function ShopifyApp() {
   }
 
   const totals = datos?.totals
+  // La tienda vende en su moneda, no en la de Mikro.
+  const money = (n) => formatMoney(n, totals?.currency || sesion.shop.currency)
 
   return (
     <Marco shop={sesion.shop}>
@@ -289,7 +291,7 @@ export default function ShopifyApp() {
         <Cifra
           icono={TrendingUp}
           label="Ventas atribuidas"
-          valor={totals ? formatEuro(totals.salesTotal) : '—'}
+          valor={totals ? money(totals.salesTotal) : '—'}
           sub="con códigos de Mikro"
         />
         <Cifra label="Pedidos" valor={totals ? formatNumber(totals.ordersCount) : '—'} sub="desde colaboraciones" />
@@ -329,7 +331,7 @@ export default function ShopifyApp() {
                   </div>
                   <div className="flex items-center gap-4">
                     <div className="text-right">
-                      <p className="text-[15px] font-black tabular-nums">{formatEuro(c.salesTotal)}</p>
+                      <p className="text-[15px] font-black tabular-nums">{money(c.salesTotal)}</p>
                       <p className="text-[11.5px] font-semibold text-ink/45">{c.ordersCount} pedidos</p>
                     </div>
                     <Boton onClick={() => crearCodigo(c.id)} loading={creando === c.id}>
@@ -345,7 +347,7 @@ export default function ShopifyApp() {
                         <Codigo code={a.code} />
                         <span>
                           {a.creator?.displayName || 'sin asignar'} · {a.ordersCount} ped. ·{' '}
-                          {formatEuro(a.salesTotal)}
+                          {money(a.salesTotal)}
                         </span>
                       </li>
                     ))}

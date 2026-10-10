@@ -25,6 +25,27 @@ export function formatEuro(n = 0, { decimals = 0 } = {}) {
   }).format(n)
 }
 
+/**
+ * Importe en la moneda de quien lo mira.
+ *
+ * formatEuro vale para Mikro, que cobra en euros. Una tienda de Shopify
+ * vende en la suya, y ensenarle sus ventas convertidas a euros de mentira
+ * (que es lo que pasaba: 84,85 USD salia como "85 EUR") no es un detalle
+ * estetico, es una cifra falsa en el panel de alguien.
+ *
+ * Los decimales se muestran salvo que el importe sea redondo: en ventas
+ * atribuidas los centimos importan.
+ */
+export function formatMoney(n = 0, currency = 'EUR') {
+  const entero = Number.isInteger(n)
+  return new Intl.NumberFormat('es-ES', {
+    style: 'currency',
+    currency: currency || 'EUR',
+    minimumFractionDigits: entero ? 0 : 2,
+    maximumFractionDigits: entero ? 0 : 2,
+  }).format(n)
+}
+
 export function formatPercent(n = 0) {
   return `${String(n).replace('.', ',')}%`
 }
