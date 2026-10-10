@@ -33,7 +33,7 @@ Catálogo y ranking públicos, búsqueda en lenguaje natural, campañas, candida
 - Stack existente: React 18 + Vite + Tailwind 3, React Router, Express + Prisma, desplegado en Netlify con Postgres (Supabase). Iconos: lucide-react.
 - Comisión única del 12%. Publicar campañas es gratis, sin cuota ni permanencia.
 - Fase: demo / MVP sin clientes reales.
-- Planificado (decidido por el usuario, sin empezar): una app de Shopify para que las tiendas creen sus campañas de Mikro desde Shopify, se midan las ventas reales que genera cada campaña y se gestione todo vinculado con Shopify.
+- App de Shopify (empezada): las tiendas ven sus campañas de Mikro dentro del admin de Shopify, dan a cada creador un código de descuento propio y ven las ventas reales que entra cada colaboración. La base está construida y probada; falta la cuenta de Shopify Partners y sus claves, que solo puede crear el dueño. Ver `docs/SHOPIFY.md`.
 - Pendiente: los creadores destacados de los datos de demostración (`backend/prisma/seed.js`) son cuentas de cientos de miles o millones de seguidores, lo que contradice el posicionamiento micro.
 
 ## Brand Commitments

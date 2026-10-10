@@ -57,6 +57,7 @@ model Brand {
   campaigns     Campaign[]
   savedCreators SavedCreator[]
   deals         Deal[]
+  shopifyShop   ShopifyShop?
 }
 
 model Creator {
@@ -110,6 +111,7 @@ model Creator {
   savedBy        SavedCreator[]
   reviews        Review[]        @relation("ReviewTarget")
   rankHistory    RankSnapshot[]
+  shopifyLinks   ShopifyAttribution[]
 }
 
 model SocialAccount {
@@ -172,6 +174,7 @@ model Campaign {
 
   applications Application[]
   deals        Deal[]
+  shopifyLinks ShopifyAttribution[]
 }
 
 model Application {
@@ -208,6 +211,7 @@ model Deal {
   messages Message[]
   reviews  Review[]
   payments Payment[]
+  shopifyLinks ShopifyAttribution[]
 }
 
 model Payment {
@@ -308,4 +312,117 @@ model DemoRequest {
 
   @@index([status, createdAt])
   @@index([email])
+}
+
+// ---------------------------------------------------------------------------
+// Shopify
+// ---------------------------------------------------------------------------
+
+// Una tienda que ha instalado la app de Mikro.
+//
+// El token de acceso caduca a la hora: Shopify ya no admite tokens offline
+// perpetuos para la Admin API en apps publicas nuevas. Por eso se guarda
+// tambien el de refresco y la fecha de caducidad, y quien pide el token se
+// encarga de renovarlo antes de usarlo.
+model ShopifyShop {
+  id           String  @id @default(cuid())
+  domain       String  @unique // tienda.myshopify.com
+  name         String?
+  email        String?
+  currency     String  @default("EUR")
+  countryCode  String?
+  planName     String?
+
+  accessToken  String?
+  refreshToken String?
+  tokenExpires DateTime?
+  scopes       String?
+
+  // La tienda se vincula a una cuenta de empresa de Mikro. Hasta que alguien
+  // la reclama desde la app, la instalacion existe pero no tiene dueno.
+  brandId String? @unique
+  brand   Brand?  @relation(fields: [brandId], references: [id], onDelete: SetNull)
+
+  installedAt   DateTime  @default(now())
+  uninstalledAt DateTime?
+
+  attributions ShopifyAttribution[]
+  orders       ShopifyOrder[]
+
+  @@index([uninstalledAt])
+}
+
+// El codigo de descuento que une una colaboracion con las ventas que genera.
+//
+// Es el metodo de atribucion principal a proposito: un codigo funciona en un
+// reel, en una story y de boca en boca, no depende de cookies ni de que el
+// seguidor compre en el mismo dispositivo, y el creador puede decirlo en voz
+// alta. El enlace con UTM se guarda como apoyo, no como fuente de verdad.
+model ShopifyAttribution {
+  id     String      @id @default(cuid())
+  shopId String
+  shop   ShopifyShop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  campaignId String?
+  campaign   Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  creatorId  String?
+  creator    Creator?  @relation(fields: [creatorId], references: [id], onDelete: SetNull)
+  dealId     String?
+  deal       Deal?     @relation(fields: [dealId], references: [id], onDelete: SetNull)
+
+  code            String // MIKRO-MARTA-7F3K
+  discountGid     String? // el descuento creado en Shopify
+  percentage      Int     @default(10)
+  landingUrl      String?
+  status          String  @default("ACTIVE") // ACTIVE | PAUSED | ENDED
+  startsAt        DateTime @default(now())
+  endsAt          DateTime?
+
+  // Agregados: evitan recorrer todos los pedidos para pintar un panel.
+  ordersCount Int   @default(0)
+  salesTotal  Float @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orders ShopifyOrder[]
+
+  @@unique([shopId, code])
+  @@index([campaignId])
+  @@index([creatorId])
+}
+
+// Un pedido atribuido a una colaboracion.
+model ShopifyOrder {
+  id     String      @id @default(cuid())
+  shopId String
+  shop   ShopifyShop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  attributionId String?
+  attribution   ShopifyAttribution? @relation(fields: [attributionId], references: [id], onDelete: SetNull)
+
+  orderGid    String
+  orderNumber String?
+  totalPrice  Float
+  currency    String   @default("EUR")
+  discountCode String?
+  processedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  // El mismo pedido puede llegar varias veces: Shopify entrega al menos una vez.
+  @@unique([shopId, orderGid])
+  @@index([attributionId])
+}
+
+// Registro de webhooks ya procesados.
+//
+// Shopify garantiza "al menos una vez", no "exactamente una vez". Sin esto,
+// un reintento sumaria dos veces la misma venta.
+model ShopifyWebhookEvent {
+  id         String   @id // X-Shopify-Webhook-Id
+  topic      String
+  shopDomain String
+  receivedAt DateTime @default(now())
+
+  @@index([receivedAt])
 }

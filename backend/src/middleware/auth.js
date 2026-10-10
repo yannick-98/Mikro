@@ -9,6 +9,10 @@ export async function attachUser(req, _res, next) {
   if (!token) return next()
   try {
     const payload = verifyToken(token)
+    // La sesion de una tienda de Shopify se firma con el mismo secreto pero no
+    // identifica a ninguna persona: sin esto se iria a buscar un usuario con
+    // id undefined en cada peticion de la app incrustada.
+    if (!payload?.sub) return next()
     const user = await prisma.user.findUnique({
       where: { id: payload.sub },
       include: { brand: true, creator: true },

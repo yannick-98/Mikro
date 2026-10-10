@@ -10,6 +10,7 @@ import CreatorProfile from './pages/CreatorProfile'
 import Resources from './pages/Resources'
 import Login from './pages/Login'
 import Register from './pages/Register'
+import ShopifyApp from './pages/ShopifyApp'
 import NotFound from './pages/NotFound'
 
 import BrandDashboard from './pages/brand/Dashboard'
@@ -82,6 +83,10 @@ export default function App() {
         <Route path="/recursos" element={<Resources />} />
         <Route path="/entrar" element={<Login />} />
         <Route path="/registro" element={<Register />} />
+
+        {/* La app incrustada en el admin de Shopify. No pasa por Protected:
+            a quien entra lo identifica Shopify, no la sesion de Mikro. */}
+        <Route path="/shopify" element={<ShopifyApp />} />
 
         {/* Las antiguas paginas de captacion viven ahora en la landing. */}
         <Route path="/para-empresas" element={<Navigate to="/" replace />} />

@@ -41,6 +41,13 @@
   [headers.values]
     Cache-Control = "no-store"
 
+# La app incrustada tiene que poder cargarse dentro del admin de Shopify, y
+# solo ahi: frame-ancestors lo permite a Shopify y se lo niega a todos los demas.
+[[headers]]
+  for = "/shopify"
+  [headers.values]
+    Content-Security-Policy = "frame-ancestors https://admin.shopify.com https://*.myshopify.com;"
+
 [[headers]]
   for = "/assets/*"
   [headers.values]

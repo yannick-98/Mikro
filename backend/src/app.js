@@ -14,6 +14,8 @@ import dealRoutes from './routes/deals.js'
 import searchRoutes from './routes/search.js'
 import rankingRoutes from './routes/rankings.js'
 import demoRoutes from './routes/demos.js'
+import shopifyRoutes from './routes/shopify.js'
+import shopifyWebhookRoutes from './routes/shopifyWebhooks.js'
 import miscRoutes from './routes/misc.js'
 
 /**
@@ -32,6 +34,11 @@ export function createApp() {
       credentials: true,
     }),
   )
+  // Los webhooks de Shopify van ANTES del parser de JSON y con el cuerpo en
+  // crudo: su firma se calcula sobre los bytes tal cual llegan, y cualquier
+  // parser que los interprete y los vuelva a serializar la invalida.
+  app.use('/api/shopify/webhooks', router(shopifyWebhookRoutes))
+
   app.use(express.json({ limit: '1mb' }))
 
   // Los datos del panel cambian con cada accion: sin esto el navegador sirve
@@ -54,6 +61,7 @@ export function createApp() {
   app.use('/api/search', router(searchRoutes))
   app.use('/api/rankings', router(rankingRoutes))
   app.use('/api/demo-requests', router(demoRoutes))
+  app.use('/api/shopify', router(shopifyRoutes))
   app.use('/api', router(miscRoutes))
 
   app.use(notFoundHandler)

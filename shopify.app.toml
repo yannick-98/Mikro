@@ -1,0 +1,45 @@
+# Configuracion de la app de Mikro para Shopify.
+#
+# Shopify gestiona la instalacion a partir de este fichero (managed install):
+# los permisos se declaran aqui y no en un flujo de OAuth propio.
+#
+#   shopify app config push   para subirlo al Partner Dashboard.
+
+name = "Mikro"
+handle = "mikro"
+application_url = "https://mikro-marketplace.netlify.app/shopify"
+embedded = true
+
+[access_scopes]
+# read_orders para atribuir las ventas, write_discounts para crear el codigo
+# de cada creador y read_products para mostrar el catalogo en el brief.
+# No se piden datos de clientes: Mikro no los necesita.
+scopes = "read_orders,write_discounts,read_products"
+
+[auth]
+redirect_urls = [
+  "https://mikro-marketplace.netlify.app/shopify",
+  "https://mikro-marketplace.netlify.app/api/shopify/callback"
+]
+
+[webhooks]
+api_version = "2026-10"
+
+  # Los tres de cumplimiento son obligatorios para estar en la App Store.
+  [webhooks.privacy_compliance]
+  customer_data_request_url = "https://mikro-marketplace.netlify.app/api/shopify/webhooks/customers-data-request"
+  customer_deletion_url = "https://mikro-marketplace.netlify.app/api/shopify/webhooks/customers-redact"
+  shop_deletion_url = "https://mikro-marketplace.netlify.app/api/shopify/webhooks/shop-redact"
+
+  # Los de negocio tambien se registran desde el codigo al abrir la app, para
+  # que una tienda que instala hoy quede suscrita hoy.
+  [[webhooks.subscriptions]]
+  topics = [ "orders/create", "orders/paid" ]
+  uri = "https://mikro-marketplace.netlify.app/api/shopify/webhooks/orders-create"
+
+  [[webhooks.subscriptions]]
+  topics = [ "app/uninstalled" ]
+  uri = "https://mikro-marketplace.netlify.app/api/shopify/webhooks/app-uninstalled"
+
+[pos]
+embedded = false
