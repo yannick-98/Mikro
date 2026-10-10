@@ -78,28 +78,52 @@ function Boton({ children, className, loading, ...rest }) {
   )
 }
 
-function Codigo({ code }) {
+/** Boton que copia un texto y lo dice. */
+function Copiable({ texto, title, className, children }) {
   const [copiado, setCopiado] = useState(false)
   return (
     <button
       type="button"
       onClick={async () => {
         try {
-          await navigator.clipboard.writeText(code)
+          await navigator.clipboard.writeText(texto)
           setCopiado(true)
           setTimeout(() => setCopiado(false), 1800)
         } catch {
-          // Sin permiso de portapapeles el codigo sigue a la vista: no pasa nada.
+          // Sin permiso de portapapeles el texto sigue a la vista: no pasa nada.
         }
       }}
-      className="inline-flex items-center gap-1.5 rounded-lg bg-black/5 px-2.5 py-1 font-mono text-[12.5px] font-bold tracking-tight transition hover:bg-black/10"
-      title="Copiar el codigo"
+      className={clsx(
+        'inline-flex items-center gap-1.5 rounded-lg bg-black/5 px-2.5 py-1 text-[12.5px] font-bold tracking-tight transition hover:bg-black/10',
+        className,
+      )}
+      title={title}
     >
-      {code}
+      {children}
       {copiado ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} className="opacity-45" />}
     </button>
   )
 }
+
+const Codigo = ({ code }) => (
+  <Copiable texto={code} title="Copiar el código" className="font-mono">
+    {code}
+  </Copiable>
+)
+
+/**
+ * El enlace que el creador pega en su bio.
+ *
+ * Se ofrece al lado del codigo y no en su lugar: el codigo se dice en voz
+ * alta en un reel, el enlace se pincha en una story, y las dos cosas acaban
+ * en el mismo pedido con el mismo descuento.
+ */
+const Enlace = ({ url }) => (
+  <Copiable texto={url} title={url} className="text-brand-700">
+    <Link2 size={12} />
+    Enlace
+  </Copiable>
+)
 
 /** Vincular la tienda con la cuenta de empresa de Mikro. */
 function Vincular({ onLink, error }) {
@@ -389,6 +413,7 @@ export default function ShopifyApp({ vista = 'panel' }) {
                     llamar={llamar}
                     creando={creando === c.id}
                     ajustes={sesion.shop.settings}
+                    host={sesion.shop.storefrontHost}
                     onCrear={(datos) => crearCodigo(c.id, datos)}
                   />
                 ) : null}
@@ -398,6 +423,7 @@ export default function ShopifyApp({ vista = 'panel' }) {
                     {c.attributions.map((a) => (
                       <li key={a.id} className="flex flex-wrap items-center gap-2 text-[12.5px] text-ink/60">
                         <Codigo code={a.code} />
+                        {a.shareUrl ? <Enlace url={a.shareUrl} /> : null}
                         <span className="rounded bg-black/[0.05] px-1.5 py-0.5 font-bold">
                           {a.percentage}%
                         </span>
@@ -426,11 +452,12 @@ export default function ShopifyApp({ vista = 'panel' }) {
 /**
  * Formulario para dar de alta un codigo.
  *
- * Tres decisiones: a quien, cuanto descuenta y como se llama el codigo. El
- * nombre se propone a partir del creador elegido, pero se puede escribir: hay
- * marcas que ya tienen una convencion y obligarlas a la nuestra seria absurdo.
+ * Tres decisiones y una opcional: a quien, cuanto descuenta, como se llama el
+ * codigo y a donde lleva su enlace. El nombre se propone a partir del creador
+ * elegido, pero se puede escribir: hay marcas que ya tienen una convencion y
+ * obligarlas a la nuestra seria absurdo.
  */
-function FormularioCodigo({ campaign, llamar, creando, onCrear, ajustes }) {
+function FormularioCodigo({ campaign, llamar, creando, onCrear, ajustes, host }) {
   const [creadores, setCreadores] = useState(null)
   const [creatorId, setCreatorId] = useState('')
   // Los valores de partida salen de la configuracion de la tienda, no de un
@@ -438,6 +465,7 @@ function FormularioCodigo({ campaign, llamar, creando, onCrear, ajustes }) {
   const [percentage, setPercentage] = useState(ajustes.defaultPercentage)
   const [code, setCode] = useState('')
   const [tocado, setTocado] = useState(false)
+  const [landing, setLanding] = useState('')
 
   useEffect(() => {
     let vivo = true
@@ -478,11 +506,13 @@ function FormularioCodigo({ campaign, llamar, creando, onCrear, ajustes }) {
           creatorId: creatorId || undefined,
           percentage: Number(percentage),
           code: valor || undefined,
+          landingUrl: landing.trim() || undefined,
         })
         if (ok) {
           setCreatorId('')
           setCode('')
           setTocado(false)
+          setLanding('')
           setPercentage(ajustes.defaultPercentage)
         }
       }}
@@ -542,10 +572,23 @@ function FormularioCodigo({ campaign, llamar, creando, onCrear, ajustes }) {
         </div>
       </div>
 
+      <label className="mt-3 block">
+        <span className={etiqueta}>Página a la que lleva el enlace (opcional)</span>
+        <div className="flex items-center gap-0 rounded-lg border border-black/15 bg-white focus-within:border-brand-500">
+          <span className="shrink-0 pl-3 text-[13px] font-semibold text-ink/35">{host}</span>
+          <input
+            value={landing}
+            onChange={(e) => setLanding(e.target.value)}
+            placeholder="/products/mi-producto"
+            className="w-full bg-transparent px-1.5 py-2 text-[13.5px] font-semibold text-ink outline-none"
+          />
+        </div>
+      </label>
+
       <p className="mt-2.5 text-[12px] text-ink/45">
         {creadores && !creadores.length
           ? 'Nadie se ha postulado todavía a esta campaña: puedes crear el código igual y asignarlo después.'
-          : 'Se crea en tu tienda al instante. Solo letras, números y guiones.'}
+          : 'El código se crea en tu tienda al instante. El enlace aplica el descuento solo, sin que nadie teclee nada, y lleva a la página que indiques.'}
       </p>
     </form>
   )

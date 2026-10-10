@@ -9,6 +9,7 @@ import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import ShopifyApp from './pages/ShopifyApp'
+import './fonts'
 import './index.css'
 
 ReactDOM.createRoot(document.getElementById('root')).render(

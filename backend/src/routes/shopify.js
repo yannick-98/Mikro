@@ -17,6 +17,7 @@ import { adminGraphql, SHOP_QUERY } from '../shopify/admin.js'
 import { API_VERSION } from '../shopify/config.js'
 import { ensureWebhooks, TOPICS, WEBHOOKS_QUERY } from '../shopify/webhooks.js'
 import { buildCode, createDiscount, deactivateDiscount, normalizeCode } from '../shopify/discounts.js'
+import { shareLink, toStorePath } from '../shopify/links.js'
 
 const router = Router()
 
@@ -62,8 +63,42 @@ const requireLinked = (req, _res, next) => {
   next()
 }
 
+/** El dominio por el que entra un comprador, no el del admin. */
+const storefrontHost = (shop) => shop.publicHost || shop.domain
+
+/** Los dominios que valen como destino de un enlace de esta tienda. */
+const dominiosPropios = (shop) => [shop.publicHost, shop.domain]
+
+/**
+ * Cada codigo, tal y como lo ve la tienda.
+ *
+ * El enlace se compone al leer y no se guarda: depende del dominio publico y
+ * del titulo de la campana, y los dos pueden cambiar despues. Un enlace
+ * guardado seria un enlace que algun dia deja de cuadrar con la realidad.
+ */
+const publicAttribution = (a, shop) => ({
+  id: a.id,
+  code: a.code,
+  percentage: a.percentage,
+  status: a.status,
+  ordersCount: a.ordersCount,
+  salesTotal: a.salesTotal,
+  refundedTotal: a.refundedTotal,
+  netTotal: a.salesTotal - a.refundedTotal,
+  landingUrl: a.landingUrl,
+  shareUrl: shareLink({
+    host: storefrontHost(shop),
+    code: a.code,
+    campaignTitle: a.campaign?.title,
+    creatorHandle: a.creator?.handle,
+    landingPath: a.landingUrl,
+  }),
+  creator: a.creator,
+})
+
 const publicShop = (shop) => ({
   domain: shop.domain,
+  storefrontHost: storefrontHost(shop),
   name: shop.name,
   currency: shop.currency,
   linked: !!shop.brandId,
@@ -118,6 +153,7 @@ router.post(
           data: {
             name: info.shop.name,
             email: info.shop.email,
+            publicHost: info.shop.primaryDomain?.host || null,
             currency: info.shop.currencyCode || 'EUR',
             countryCode: info.shop.shopAddress?.countryCodeV2 || null,
             planName: info.shop.plan?.publicDisplayName || null,
@@ -125,6 +161,7 @@ router.post(
         })
         shop.name = info.shop.name
         shop.currency = info.shop.currencyCode || shop.currency
+        shop.publicHost = info.shop.primaryDomain?.host || shop.publicHost
       }
       await ensureWebhooks(datos.shop)
     } catch (e) {
@@ -251,24 +288,17 @@ router.get(
       prisma.shopifyAttribution.findMany({
         where: { shopId: shop.id },
         orderBy: { createdAt: 'desc' },
-        include: { creator: { select: { handle: true, displayName: true, avatarUrl: true } } },
+        include: {
+          creator: { select: { handle: true, displayName: true, avatarUrl: true } },
+          campaign: { select: { title: true } },
+        },
       }),
     ])
 
     const porCampana = new Map()
     for (const a of attributions) {
       const lista = porCampana.get(a.campaignId) || []
-      lista.push({
-        id: a.id,
-        code: a.code,
-        percentage: a.percentage,
-        status: a.status,
-        ordersCount: a.ordersCount,
-        salesTotal: a.salesTotal,
-        refundedTotal: a.refundedTotal,
-        netTotal: a.salesTotal - a.refundedTotal,
-        creator: a.creator,
-      })
+      lista.push(publicAttribution(a, shop))
       porCampana.set(a.campaignId, lista)
     }
 
@@ -320,6 +350,7 @@ router.post(
         creatorId: z.string().min(1).optional(),
         percentage: z.number().int().min(1).max(60).optional(),
         code: z.string().trim().max(40).optional(),
+        landingUrl: z.string().trim().max(400).optional(),
         endsAt: z.string().datetime().optional(),
         oncePerCustomer: z.boolean().optional(),
       }),
@@ -341,6 +372,15 @@ router.post(
       : buildCode(creator?.handle || campaign.title, req.shop.codePrefix)
     const percentage = data.percentage ?? req.shop.defaultPercentage
     if (data.code && code.length < 3) throw badRequest('El codigo necesita al menos 3 letras o numeros')
+
+    // El destino se valida antes de crear nada en Shopify: un enlace mal
+    // escrito no deberia dejar un descuento suelto en la tienda.
+    let landingPath = null
+    try {
+      landingPath = toStorePath(data.landingUrl, dominiosPropios(req.shop))
+    } catch (e) {
+      throw badRequest(e.message)
+    }
 
     // Dos codigos iguales en la misma tienda romperian la atribucion: el
     // webhook no sabria a cual de las dos colaboraciones apuntar la venta.
@@ -365,11 +405,56 @@ router.post(
         code,
         discountGid,
         percentage,
+        landingUrl: landingPath,
         endsAt: data.endsAt ? new Date(data.endsAt) : null,
+      },
+      include: {
+        creator: { select: { handle: true, displayName: true, avatarUrl: true } },
+        campaign: { select: { title: true } },
       },
     })
 
-    res.status(201).json({ attribution })
+    res.status(201).json({ attribution: publicAttribution(attribution, req.shop) })
+  }),
+)
+
+/**
+ * Cambia el destino del enlace de un codigo.
+ *
+ * Se puede despues de crearlo porque el motivo mas comun para cambiarlo es
+ * que el producto de la campana se agote o cambie de ficha, y en ese momento
+ * el enlace ya esta publicado: tiene que poder reapuntarse sin dar de alta
+ * otro codigo y perder el historico.
+ */
+router.patch(
+  '/attributions/:id',
+  requireShop,
+  requireLinked,
+  asyncHandler(async (req, res) => {
+    const data = parseBody(
+      z.object({ landingUrl: z.string().trim().max(400).nullable().optional() }),
+      req.body,
+    )
+
+    const attribution = await prisma.shopifyAttribution.findUnique({ where: { id: req.params.id } })
+    if (!attribution || attribution.shopId !== req.shop.id) throw notFound('Ese codigo no existe')
+
+    let landingPath = null
+    try {
+      landingPath = toStorePath(data.landingUrl, dominiosPropios(req.shop))
+    } catch (e) {
+      throw badRequest(e.message)
+    }
+
+    const actualizada = await prisma.shopifyAttribution.update({
+      where: { id: attribution.id },
+      data: { landingUrl: landingPath },
+      include: {
+        creator: { select: { handle: true, displayName: true, avatarUrl: true } },
+        campaign: { select: { title: true } },
+      },
+    })
+    res.json({ attribution: publicAttribution(actualizada, req.shop) })
   }),
 )
 
@@ -448,15 +533,7 @@ router.get(
       tokenExpires: shop.tokenExpires,
       webhooks,
       attributions: attributions.map((a) => ({
-        id: a.id,
-        code: a.code,
-        percentage: a.percentage,
-        status: a.status,
-        ordersCount: a.ordersCount,
-        salesTotal: a.salesTotal,
-        refundedTotal: a.refundedTotal,
-        netTotal: a.salesTotal - a.refundedTotal,
-        creator: a.creator,
+        ...publicAttribution(a, shop),
         campaign: a.campaign?.title || null,
         createdAt: a.createdAt,
       })),

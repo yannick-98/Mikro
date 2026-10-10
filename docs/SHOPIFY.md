@@ -312,15 +312,47 @@ No solo en Shopify:
   un creador eso no es una métrica más: es el argumento con el que pedir más
   en la siguiente colaboración.
 
+## El enlace que comparte el creador
+
+El código sigue siendo la fuente de verdad de la atribución. El enlace es su
+apoyo, y hace dos cosas que un código dicho en voz alta no puede:
+
+```
+https://tutienda.com/discount/IMPULSO-MARTA?redirect=%2Fproducts%2Frosas%3Futm_source%3Dmikro%26...
+```
+
+- **Aplica el descuento solo.** La ruta `/discount/CÓDIGO` es la forma oficial
+  de Shopify; el parámetro `redirect` lleva al seguidor donde diga la empresa.
+  El pedido llega con su `discount_codes` igual, así que la medición no cambia:
+  mejora la conversión sin debilitar la atribución.
+- **Trae `utm_*`**, que es lo único que entiende la analítica de la propia
+  tienda. Así la empresa ve el tráfico del creador en su Shopify, no solo en el
+  panel de Mikro.
+
+Dos decisiones que no son obvias:
+
+**Los `utm_` van dentro del `redirect`, no al final del enlace.** Shopify los
+acepta en los dos sitios, pero hay informes de que el salto desde `/discount` no
+siempre arrastra los parámetros de arriba, y la analítica lee la dirección de la
+página en la que aterriza el visitante. Dentro del destino, el navegador acaba en
+una URL que los lleva escritos y no hay nada que confiar.
+
+**El destino se guarda como ruta, nunca como URL entera.** `toStorePath()` valida
+lo que escribe la tienda contra sus propios dominios y se queda con la ruta.
+Aceptar cualquier URL convertiría el enlace en un salto cómodo hacia una página
+de phishing, con la credibilidad del creador detrás. Está cubierto por pruebas.
+
+El enlace se compone al leer, no se guarda: depende del dominio público y del
+título de la campaña, y los dos pueden cambiar después.
+
+**Lo que no se ha podido comprobar de punta a punta:** que el descuento quede
+aplicado al abrir el enlace. El escaparate de la tienda de pruebas está protegido
+con contraseña y no entro ahí. El formato es el que documenta Shopify y el
+constructor está probado, pero la última comprobación es abrir uno de estos
+enlaces en un navegador con acceso a la tienda y mirar el carrito.
+
 ## Pendiente
 
-- Probar el ciclo completo contra una tienda de desarrollo. El conector de Shopify
-  permitirá crear un descuento real y comprobar la forma de `discount_codes` en un
-  pedido de verdad, en cuanto esté autenticado.
-- Crear la app en el Partner Dashboard. **No se puede hacer por API con el conector
-  disponible**: este habla con una tienda (Admin API), y las apps se crean en el Partner
-  Dashboard. Hay que hacerlo a mano.
-- Asignar creador a cada código desde la interfaz: ahora se crea uno por campaña y el
-  creador se asocia por API, pero la pantalla todavía no deja elegirlo.
-- Enlace con UTM como apoyo del código: el modelo ya guarda `landingUrl`.
 - Facturación por la App Store si algún día la app deja de ser gratuita.
+- Revisión formal de datos protegidos de cliente para publicar en la App Store
+  (el paso 1 del formulario, que da acceso en desarrollo, ya está).

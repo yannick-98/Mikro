@@ -29,7 +29,7 @@ const TITULAR = {
   ciudad: 'Valencia',
 }
 
-const ACTUALIZADO = '10 de octubre de 2026'
+const ACTUALIZADO = '11 de octubre de 2026'
 
 function Pendiente({ children }) {
   return (
@@ -366,11 +366,6 @@ export function Privacidad() {
             'Solo si conectas una tienda: la app se comunica con tu tienda',
             'Según la ubicación de tu tienda',
           ],
-          [
-            'Google Fonts',
-            'Tipografía de la web, servida desde su CDN',
-            'Estados Unidos',
-          ],
         ]}
       />
       <P>
@@ -380,10 +375,29 @@ export function Privacidad() {
 
       <H id="transferencias">5. Transferencias fuera del Espacio Económico Europeo</H>
       <P>
-        La base de datos está en la Unión Europea. El alojamiento (Netlify) y la carga de tipografías
-        (Google) implican tratamiento en Estados Unidos, amparado en las garantías del RGPD:
-        adhesión al Marco de Privacidad de Datos UE-EEUU o cláusulas contractuales tipo.{' '}
-        <Pendiente>Verificar y detallar el mecanismo de cada proveedor antes de publicar.</Pendiente>
+        La base de datos está en Irlanda, dentro de la Unión Europea: tus datos no salen del EEE
+        para almacenarse. Lo que sí implica tratamiento fuera es el alojamiento de la web y de la
+        API, y la conexión con Shopify si decides usarla. En los dos casos hay un mecanismo de
+        transferencia previsto en el RGPD:
+      </P>
+      <Tabla
+        cabeceras={['Proveedor', 'Mecanismo', 'Base']}
+        filas={[
+          [
+            'Netlify',
+            'Marco de Privacidad de Datos UE-EEUU',
+            'Entidad certificada, con las cláusulas contractuales tipo de 2021 en su contrato de encargado como respaldo',
+          ],
+          [
+            'Shopify',
+            'Normas Corporativas Vinculantes',
+            'Los datos del EEE los trata Shopify International Ltd. (Irlanda); sus transferencias internas se amparan en sus NCV aprobadas, con las cláusulas de 2021 como salvaguarda adicional',
+          ],
+        ]}
+      />
+      <P>
+        La tipografía de la web se sirve desde nuestro propio dominio. No hay ninguna petición a
+        servidores de Google al abrir la página, ni, por tanto, comunicación de tu IP a Google.
       </P>
 
       <H id="cookies">6. Cookies y almacenamiento en tu navegador</H>
@@ -399,11 +413,9 @@ export function Privacidad() {
         sesión. Al ser estrictamente necesario, no requiere consentimiento.
       </P>
       <P>
-        Sí conviene saber que la tipografía se carga desde los servidores de Google, lo que comunica
-        tu dirección IP a Google al abrir la página.{' '}
-        <Pendiente>
-          Esto se evita alojando la tipografía en el propio servidor; está pendiente de hacer.
-        </Pendiente>
+        Tampoco se carga nada desde servidores de terceros al abrir la página: la tipografía viaja
+        desde nuestro propio dominio, precisamente para que tu navegador no tenga que anunciar tu
+        dirección IP a nadie más.
       </P>
 
       <H id="automatizadas">7. El ranking es un cálculo automático</H>

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import clsx from 'clsx'
-import { AlertTriangle, Check, Link2Off, RefreshCw, ShieldCheck, Unplug } from 'lucide-react'
+import { AlertTriangle, Check, Link2, Link2Off, RefreshCw, ShieldCheck, Unplug } from 'lucide-react'
 import { Spinner } from '../ui'
 import { formatMoney } from '../../lib/format'
 
@@ -63,6 +63,125 @@ function Boton({ children, className, loading, ...rest }) {
   )
 }
 
+/**
+ * Un codigo con su enlace y su destino.
+ *
+ * El enlace se ensena entero aunque sea largo: quien lo va a pegar en una bio
+ * tiene derecho a ver a donde lleva antes de darselo a un creador.
+ */
+function FilaCodigo({ a, host, money, ocupado, confirmando, onConfirmar, onRetirar, onDestino }) {
+  const [editando, setEditando] = useState(false)
+  const [valor, setValor] = useState(a.landingUrl || '')
+  const estado = ESTADOS[a.status] || ESTADOS.ACTIVE
+
+  const guardar = async () => {
+    const ok = await onDestino(a.id, valor.trim() || null)
+    if (ok) setEditando(false)
+  }
+
+  return (
+    <div className="py-3 first:pt-0 last:pb-0">
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="rounded-lg bg-black/[0.05] px-2 py-1 font-mono text-[12.5px] font-bold">
+          {a.code}
+        </span>
+        <span className="rounded bg-black/[0.05] px-1.5 py-0.5 text-[12px] font-bold">
+          {a.percentage}%
+        </span>
+        <span className={clsx('rounded-full px-2 py-0.5 text-[11.5px] font-bold', estado.clase)}>
+          {estado.texto}
+        </span>
+        <span className="text-[12.5px] text-ink/55">
+          {a.creator?.displayName || 'sin asignar'}
+          {a.campaign ? ` · ${a.campaign}` : ''}
+        </span>
+        <span className="ml-auto text-[12.5px] font-bold tabular-nums">
+          {a.ordersCount} ped. · {money(a.netTotal)}
+        </span>
+        {a.status !== 'ENDED' ? (
+          confirmando ? (
+            <span className="flex items-center gap-1.5">
+              <Boton
+                onClick={() => onConfirmar(null)}
+                className="!px-2.5 !py-1.5 !text-[12px] bg-black/[0.06] text-ink hover:bg-black/10"
+              >
+                No
+              </Boton>
+              <Boton
+                onClick={() => onRetirar(a.id)}
+                loading={ocupado}
+                className="!px-2.5 !py-1.5 !text-[12px] bg-rose-600 text-white hover:bg-rose-700"
+              >
+                Retirar
+              </Boton>
+            </span>
+          ) : (
+            <Boton
+              onClick={() => onConfirmar(a.id)}
+              className="!px-2.5 !py-1.5 !text-[12px] bg-black/[0.06] text-ink hover:bg-black/10"
+            >
+              Retirar
+            </Boton>
+          )
+        ) : null}
+      </div>
+
+      {a.shareUrl ? (
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <Link2 size={12} className="shrink-0 text-ink/30" />
+          <code className="min-w-0 break-all text-[11.5px] text-ink/50">{a.shareUrl}</code>
+          <button
+            type="button"
+            onClick={() => navigator.clipboard?.writeText(a.shareUrl).catch(() => {})}
+            className="rounded-md bg-black/[0.05] px-2 py-0.5 text-[11.5px] font-bold text-ink/60 transition hover:bg-black/10"
+          >
+            Copiar
+          </button>
+          {a.status !== 'ENDED' && !editando ? (
+            <button
+              type="button"
+              onClick={() => setEditando(true)}
+              className="text-[11.5px] font-bold text-brand-600 hover:underline"
+            >
+              {a.landingUrl ? 'Cambiar destino' : 'Elegir destino'}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
+      {editando ? (
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <div className="flex min-w-[260px] flex-1 items-center rounded-lg border border-black/15 bg-white focus-within:border-brand-500">
+            <span className="shrink-0 pl-2.5 text-[12.5px] font-semibold text-ink/35">{host}</span>
+            <input
+              value={valor}
+              onChange={(e) => setValor(e.target.value)}
+              placeholder="/products/mi-producto"
+              className="w-full bg-transparent px-1.5 py-1.5 text-[12.5px] font-semibold text-ink outline-none"
+            />
+          </div>
+          <Boton
+            onClick={guardar}
+            loading={ocupado}
+            className="!px-2.5 !py-1.5 !text-[12px] bg-brand-600 text-white hover:bg-brand-700"
+          >
+            Guardar
+          </Boton>
+          <Boton
+            onClick={() => {
+              setValor(a.landingUrl || '')
+              setEditando(false)
+            }}
+            className="!px-2.5 !py-1.5 !text-[12px] bg-black/[0.06] text-ink hover:bg-black/10"
+          >
+            Cancelar
+          </Boton>
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
 export default function Configuracion({ llamar, shop, onShopChange, onError }) {
   const [datos, setDatos] = useState(null)
   const [form, setForm] = useState(null)
@@ -106,6 +225,21 @@ export default function Configuracion({ llamar, shop, onShopChange, onError }) {
       onError?.(e.message)
     } finally {
       setGuardando(false)
+    }
+  }
+
+  /** Reapunta el enlace de un codigo a otra pagina de la tienda. */
+  const destino = async (id, landingUrl) => {
+    setOcupado(id)
+    try {
+      await llamar(`/attributions/${id}`, { method: 'PATCH', body: { landingUrl } })
+      await cargar()
+      return true
+    } catch (e) {
+      onError?.(e.message)
+      return false
+    } finally {
+      setOcupado(null)
     }
   }
 
@@ -262,61 +396,25 @@ export default function Configuracion({ llamar, shop, onShopChange, onError }) {
       {/* ------------------------------------------------------------------ */}
       <Seccion
         titulo="Tus códigos"
-        descripcion="Retirar un código lo desactiva en tu tienda. Las ventas que ya trajo se conservan."
+        descripcion="Cada código tiene un enlace que ya lo aplica, para que el creador lo pegue en su bio. Retirar un código lo desactiva en tu tienda; las ventas que ya trajo se conservan."
       >
         {!datos.attributions.length ? (
           <p className="py-6 text-center text-[13.5px] text-ink/45">Todavía no has creado ninguno.</p>
         ) : (
           <div className="divide-y divide-black/[0.06]">
-            {datos.attributions.map((a) => {
-              const estado = ESTADOS[a.status] || ESTADOS.ACTIVE
-              return (
-                <div key={a.id} className="flex flex-wrap items-center gap-3 py-3 first:pt-0 last:pb-0">
-                  <span className="rounded-lg bg-black/[0.05] px-2 py-1 font-mono text-[12.5px] font-bold">
-                    {a.code}
-                  </span>
-                  <span className="rounded bg-black/[0.05] px-1.5 py-0.5 text-[12px] font-bold">
-                    {a.percentage}%
-                  </span>
-                  <span className={clsx('rounded-full px-2 py-0.5 text-[11.5px] font-bold', estado.clase)}>
-                    {estado.texto}
-                  </span>
-                  <span className="text-[12.5px] text-ink/55">
-                    {a.creator?.displayName || 'sin asignar'}
-                    {a.campaign ? ` · ${a.campaign}` : ''}
-                  </span>
-                  <span className="ml-auto text-[12.5px] font-bold tabular-nums">
-                    {a.ordersCount} ped. · {money(a.netTotal)}
-                  </span>
-                  {a.status !== 'ENDED' ? (
-                    confirmando === a.id ? (
-                      <span className="flex items-center gap-1.5">
-                        <Boton
-                          onClick={() => setConfirmando(null)}
-                          className="!px-2.5 !py-1.5 !text-[12px] bg-black/[0.06] text-ink hover:bg-black/10"
-                        >
-                          No
-                        </Boton>
-                        <Boton
-                          onClick={() => retirar(a.id)}
-                          loading={ocupado === a.id}
-                          className="!px-2.5 !py-1.5 !text-[12px] bg-rose-600 text-white hover:bg-rose-700"
-                        >
-                          Retirar
-                        </Boton>
-                      </span>
-                    ) : (
-                      <Boton
-                        onClick={() => setConfirmando(a.id)}
-                        className="!px-2.5 !py-1.5 !text-[12px] bg-black/[0.06] text-ink hover:bg-black/10"
-                      >
-                        Retirar
-                      </Boton>
-                    )
-                  ) : null}
-                </div>
-              )
-            })}
+            {datos.attributions.map((a) => (
+              <FilaCodigo
+                key={a.id}
+                a={a}
+                host={datos.shop.storefrontHost}
+                money={money}
+                ocupado={ocupado === a.id}
+                confirmando={confirmando === a.id}
+                onConfirmar={setConfirmando}
+                onRetirar={retirar}
+                onDestino={destino}
+              />
+            ))}
           </div>
         )}
       </Seccion>

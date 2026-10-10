@@ -25,6 +25,7 @@ const { webhookSignatureValid, querySignatureValid, verifySessionToken } = await
   '../src/shopify/verify.js'
 )
 const { buildCode } = await import('../src/shopify/discounts.js')
+const { shareLink, toStorePath } = await import('../src/shopify/links.js')
 const { toShopDomain, isShopDomain } = await import('../src/shopify/config.js')
 
 let passed = 0
@@ -134,6 +135,81 @@ check('acentos y puntos fuera', buildCode('josé.lópez').startsWith('MIKRO-JOSE
 check('sin handle sigue dando codigo', /^MIKRO-CREADOR-/.test(buildCode('')))
 const muestras = new Set(Array.from({ length: 300 }, () => buildCode('marta')))
 check('los codigos no se repiten', muestras.size === 300, `${muestras.size}/300`)
+
+// ---------------------------------------------------------------------------
+console.log('\n--- Enlaces para compartir ---')
+
+const HOSTS = ['flores.example', 'tienda-demo.myshopify.com']
+
+check('destino vacio no es destino', toStorePath('', HOSTS) === null)
+check('solo la barra no es destino', toStorePath('/', HOSTS) === null)
+check('ruta suelta', toStorePath('/products/rosas', HOSTS) === '/products/rosas')
+check('ruta sin barra inicial', toStorePath('products/rosas', HOSTS) === '/products/rosas')
+check(
+  'url propia se reduce a su ruta',
+  toStorePath('https://flores.example/products/rosas?variant=7', HOSTS) === '/products/rosas?variant=7',
+)
+check('el www no cambia de tienda', toStorePath('https://www.flores.example/a', HOSTS) === '/a')
+check(
+  'dominio de myshopify tambien vale',
+  toStorePath('https://tienda-demo.myshopify.com/collections/todo', HOSTS) === '/collections/todo',
+)
+
+// Esto es lo que impide que el enlace de un creador lleve a otro sitio: sin
+// esta comprobacion, el redirect de Shopify seria un salto comodo hacia una
+// pagina de phishing con la credibilidad del creador detras.
+const fuera = (valor) => {
+  try {
+    toStorePath(valor, HOSTS)
+    return false
+  } catch {
+    return true
+  }
+}
+check('otro dominio rechazado', fuera('https://evil.example/login'))
+check('subdominio enganoso rechazado', fuera('https://flores.example.evil.com/x'))
+check('url sin esquema rechazada', fuera('//evil.example/x'))
+
+const enlace = shareLink({
+  host: 'flores.example',
+  code: 'IMPULSO-MARTA',
+  campaignTitle: 'Reto 21 días',
+  creatorHandle: 'marta.garcia',
+  landingPath: '/products/rosas',
+})
+const partes = new URL(enlace)
+check('el enlace aplica el codigo', partes.pathname === '/discount/IMPULSO-MARTA', partes.pathname)
+
+// El destino, con los utm_ dentro: es la direccion en la que acaba el
+// visitante, y la que lee la analitica de la tienda.
+const aterriza = new URL(partes.searchParams.get('redirect'), 'https://flores.example')
+check('lleva al destino', aterriza.pathname === '/products/rosas', aterriza.pathname)
+check('trae utm_source', aterriza.searchParams.get('utm_source') === 'mikro')
+check('la campana viaja en utm_campaign', aterriza.searchParams.get('utm_campaign') === 'reto-21-dias')
+check('el creador viaja en utm_content', aterriza.searchParams.get('utm_content') === 'marta-garcia')
+
+const destinoDe = (opts) =>
+  new URL(new URL(shareLink(opts)).searchParams.get('redirect'), 'https://flores.example')
+check(
+  'sin creador, el utm_content es el codigo',
+  destinoDe({ host: 'flores.example', code: 'ABC-1' }).searchParams.get('utm_content') === 'abc-1',
+)
+check(
+  'sin destino, el enlace lleva a la portada',
+  destinoDe({ host: 'flores.example', code: 'ABC-1' }).pathname === '/',
+)
+
+// Un destino que ya traia parametros no los pierde: /products/x?variant=7
+// sigue llevando su variante, con los utm_ aniadidos al lado.
+const conVariante = destinoDe({
+  host: 'flores.example',
+  code: 'ABC-1',
+  landingPath: '/products/rosas?variant=7',
+})
+check('el destino conserva sus parametros', conVariante.searchParams.get('variant') === '7')
+check('y recibe los utm igualmente', conVariante.searchParams.get('utm_source') === 'mikro')
+
+check('sin dominio no se inventa enlace', shareLink({ host: null, code: 'ABC' }) === null)
 
 // ---------------------------------------------------------------------------
 console.log('\n--- Ruta de webhooks (cuerpo en crudo) ---')

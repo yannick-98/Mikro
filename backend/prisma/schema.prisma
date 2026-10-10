@@ -327,6 +327,9 @@ model DemoRequest {
 model ShopifyShop {
   id           String  @id @default(cuid())
   domain       String  @unique // tienda.myshopify.com
+  // El dominio publico, que no suele ser el de myshopify. Los enlaces que
+  // comparte un creador llevan este: nadie pone un .myshopify.com en su bio.
+  publicHost   String?
   name         String?
   email        String?
   currency     String  @default("EUR")
@@ -380,6 +383,9 @@ model ShopifyAttribution {
   code            String // MIKRO-MARTA-7F3K
   discountGid     String? // el descuento creado en Shopify
   percentage      Int     @default(10)
+  // Destino del enlace que se comparte, guardado como ruta de la tienda
+  // ("/products/x"). Ruta y no URL entera: asi el enlace no puede acabar
+  // llevando a otro dominio.
   landingUrl      String?
   status          String  @default("ACTIVE") // ACTIVE | PAUSED | ENDED
   startsAt        DateTime @default(now())

@@ -280,6 +280,17 @@ async function main() {
   })
   check('la cuenta de prueba se retira', retirado.json.creator?.available === false)
 
+  // Y la campana, igual. Sin esto, cada ejecucion dejaba una oferta mas de
+  // "Floristeria Test" en el listado publico: una empresa que no existe
+  // buscando creadores que nunca va a contratar. El listado solo muestra las
+  // abiertas, asi que cerrarla la saca de la vista sin perder el historico.
+  const cerrada = await call(`/campaigns/${campaignId}`, {
+    method: 'PATCH',
+    token: brandToken,
+    body: { status: 'CLOSED' },
+  })
+  check('la campana de prueba se cierra', cerrada.json.campaign?.status === 'CLOSED')
+
   console.log(`\n=== ${passed} correctas, ${failed} fallidas ===\n`)
   process.exit(failed > 0 ? 1 : 0)
 }
