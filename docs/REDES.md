@@ -184,3 +184,12 @@ automatizada.
   declarados.
 - Mostrar la evolución de seguidores en el perfil: los `SocialSnapshot` ya se
   guardan, falta pintarlos.
+
+---
+
+## Despliegue
+
+El sitio compila desde GitHub: cada `push` a `main` dispara una compilación en
+una máquina limpia de Netlify. No hace falta desplegar a mano, y es mejor que
+no se haga: compilar en un portátil con Windows metía en el paquete de la
+función cosas que no pintan nada en Linux.
