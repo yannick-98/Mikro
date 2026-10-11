@@ -7,6 +7,7 @@ import { Avatar, EmptyState, Modal, Spinner, Toast, useAsync, useToast } from '.
 import { StatusPill } from './Dashboard'
 import EntregasYFacturas from './EntregasYFacturas'
 import EnvioProducto from './EnvioProducto'
+import { AvisoPagosSimulados } from './CobrosCreador'
 import { DEAL_STATUS, formatEuro, formatRelative } from '../lib/format'
 
 /** Acciones disponibles en cada estado, por rol. */
@@ -330,7 +331,14 @@ export default function DealsView({ role, meId }) {
   async function act(deal, action, payload) {
     setBusy(true)
     try {
-      await api.dealAction(deal.id, action, payload)
+      const r = await api.dealAction(deal.id, action, payload)
+
+      // Con pasarela, "depositar" no avanza nada: devuelve la pagina de pago
+      // de Stripe, y la colaboracion pasa a pagada cuando Stripe lo confirma.
+      if (r?.pago?.url) {
+        window.location.href = r.pago.url
+        return true
+      }
       const labels = {
         fund: 'Importe depositado en garantia',
         start: 'Colaboracion iniciada',
@@ -378,6 +386,8 @@ export default function DealsView({ role, meId }) {
 
   return (
     <>
+      <AvisoPagosSimulados className="mb-4" />
+
       <div className="mb-5 flex flex-wrap gap-2">
         {[
           { id: 'ACTIVE', label: `En curso (${totals.active})` },
@@ -561,7 +571,7 @@ export default function DealsView({ role, meId }) {
 
                   {d.status === 'ACCEPTED' && role === 'BRAND' ? (
                     <span className="ml-auto inline-flex items-center gap-1.5 text-[12px] font-semibold text-ink/45">
-                      <ShieldCheck size={14} /> El pago queda retenido hasta que apruebes
+                      <ShieldCheck size={14} /> El importe se cobra ahora y no se le envía hasta que apruebes
                     </span>
                   ) : null}
                 </div>

@@ -8,6 +8,8 @@ import { recomputeCreator } from '../services/creatorStats.js'
 import { notify } from '../services/notify.js'
 import { emitirFacturas, publicInvoice } from '../services/invoice.js'
 import { repartoDeal } from '../services/pay.js'
+import { stripeConfigured } from '../stripe/config.js'
+import { abrirCobro, devolver, transferirAlCreador } from '../stripe/payments.js'
 
 const router = Router()
 
@@ -185,6 +187,9 @@ router.post(
  * ACCEPTED -> FUNDED -> IN_PROGRESS -> SUBMITTED -> APPROVED -> PAID
  */
 const TRANSITIONS = {
+  // fund solo avanza solo cuando no hay pasarela. Con Stripe, quien pasa la
+  // colaboracion a FUNDED es el webhook del cobro, nunca esta llamada: fiarse
+  // de la vuelta del navegador permitiria marcar como pagado sin pagar.
   fund: { from: ['ACCEPTED'], to: 'FUNDED', actor: 'BRAND' },
   start: { from: ['FUNDED'], to: 'IN_PROGRESS', actor: 'CREATOR' },
   submit: { from: ['FUNDED', 'IN_PROGRESS'], to: 'SUBMITTED', actor: 'CREATOR' },
@@ -355,6 +360,38 @@ router.post(
       throw badRequest(`No se puede pasar de ${deal.status} a ${rule.to}`)
     }
 
+    // Pagar no es una transicion de estado: es mandar a la empresa a pagar.
+    //
+    // Con Stripe, esta llamada devuelve la direccion de la pagina de pago y
+    // no toca nada. La colaboracion pasa a FUNDED cuando Stripe confirma el
+    // cobro por webhook, que es el unico sitio donde eso puede decidirse.
+    if (action === 'fund' && stripeConfigured()) {
+      const completo = await prisma.deal.findUnique({
+        where: { id: deal.id },
+        include: {
+          campaign: { select: { title: true } },
+          creator: { select: { id: true, displayName: true, stripePayoutsOk: true } },
+        },
+      })
+
+      // Avisar ahora y no al liberar el pago: enterarse de que el creador no
+      // puede cobrar despues de haberle pagado a Mikro es la peor forma de
+      // descubrirlo.
+      if (!completo.creator?.stripePayoutsOk) {
+        throw badRequest(
+          'Este creador todavía no ha terminado su alta de cobros. Le hemos avisado; en cuanto la complete podrás pagar.',
+        )
+      }
+
+      const brand = await prisma.brand.findUnique({
+        where: { id: deal.brandId },
+        include: { user: { select: { email: true } } },
+      })
+
+      const url = await abrirCobro(completo, brand)
+      return res.json({ pago: { url }, deal: serializeDeal(deal, isBrand ? 'BRAND' : 'CREATOR') })
+    }
+
     const data = { status: rule.to }
     if (action === 'submit') {
       if (!req.body?.contentUrl) throw badRequest('Indica el enlace al contenido publicado')
@@ -416,36 +453,70 @@ router.post(
       }
     }
 
-    // Movimientos de dinero simulados (escrow)
-    if (action === 'fund') {
+    // ---------------------------------------------------------------------
+    // El dinero.
+    //
+    // Con Stripe configurado se mueve de verdad. Sin el, se anotan los
+    // mismos movimientos marcados como SIMULATED y la interfaz lo dice: una
+    // garantia de pago que no existe es peor que no ofrecer ninguna.
+    // ---------------------------------------------------------------------
+    const conStripe = stripeConfigured()
+
+    // Sin pasarela, el cobro se anota igualmente para que el libro de
+    // movimientos quede completo: una colaboracion pagada tiene que tener su
+    // entrada y su salida, aunque las dos sean simuladas. Si no, cuadrar las
+    // cuentas despues es imposible.
+    if (action === 'fund' && !conStripe) {
       await prisma.payment.create({
         data: {
           dealId: deal.id,
           amount: deal.fee,
           fee: deal.feePlatform,
           kind: 'ESCROW_IN',
+          provider: 'SIMULATED',
           reference: `ESC-${deal.id.slice(-6).toUpperCase()}`,
         },
       })
     }
+
     if (action === 'release') {
-      await prisma.payment.create({
-        data: {
-          dealId: deal.id,
-          amount: deal.fee - deal.feePlatform,
-          fee: deal.feePlatform,
-          kind: 'PAYOUT',
-          reference: `PAY-${deal.id.slice(-6).toUpperCase()}`,
-        },
-      })
+      if (conStripe) {
+        const creator = await prisma.creator.findUnique({ where: { id: deal.creatorId } })
+        // No se puede transferir a una cuenta que Stripe no ha verificado, y
+        // decirlo asi es mas util que un error de la pasarela.
+        await transferirAlCreador({ ...deal, status: rule.to }, creator)
+      } else {
+        await prisma.payment.create({
+          data: {
+            dealId: deal.id,
+            amount: deal.fee - deal.feePlatform,
+            fee: deal.feePlatform,
+            kind: 'PAYOUT',
+            provider: 'SIMULATED',
+            reference: `PAY-${deal.id.slice(-6).toUpperCase()}`,
+          },
+        })
+      }
       await recomputeCreator(deal.creatorId)
     }
+
     if (action === 'cancel') {
-      const funded = deal.payments.some((p) => p.kind === 'ESCROW_IN')
-      if (funded) {
-        await prisma.payment.create({
-          data: { dealId: deal.id, amount: deal.fee, fee: 0, kind: 'REFUND', reference: `REF-${deal.id.slice(-6).toUpperCase()}` },
-        })
+      const cobrado = deal.payments.some((p) => p.kind === 'ESCROW_IN' && p.status === 'COMPLETED')
+      if (cobrado) {
+        if (conStripe && deal.stripePaymentIntent) {
+          await devolver({ ...deal })
+        } else {
+          await prisma.payment.create({
+            data: {
+              dealId: deal.id,
+              amount: deal.fee,
+              fee: 0,
+              kind: 'REFUND',
+              provider: 'SIMULATED',
+              reference: `REF-${deal.id.slice(-6).toUpperCase()}`,
+            },
+          })
+        }
       }
     }
 

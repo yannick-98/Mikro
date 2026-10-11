@@ -65,6 +65,9 @@ model Brand {
   savedCreators SavedCreator[]
   deals         Deal[]
   shopifyShop   ShopifyShop?
+
+  // Su cliente en Stripe, para no pedirle la tarjeta en cada colaboracion.
+  stripeCustomerId String?
 }
 
 model Creator {
@@ -136,6 +139,21 @@ model Creator {
   reviews        Review[]             @relation("ReviewTarget")
   rankHistory    RankSnapshot[]
   shopifyLinks   ShopifyAttribution[]
+
+  // Su cuenta de Stripe (Express): donde aterriza el dinero cuando la
+  // empresa aprueba el trabajo.
+  //
+  // El alta y la verificacion de identidad las hace Stripe en su propio
+  // formulario. Nosotros no vemos ni guardamos un DNI ni un IBAN, y eso no
+  // es comodidad: es no querer ser responsables de custodiar esos datos.
+  stripeAccountId   String?
+  // Lo que Stripe dice que puede hacer esa cuenta, refrescado por webhook.
+  // Sin payoutsOk no se le puede transferir nada, y conviene saberlo antes
+  // de cerrar un trato y no al intentar pagarle.
+  stripeChargesOk   Boolean   @default(false)
+  stripePayoutsOk   Boolean   @default(false)
+  stripePendiente   String?
+  stripeOnboardedAt DateTime?
 }
 
 // Una cuenta de red social del creador.
@@ -395,6 +413,12 @@ model Deal {
   shopifyLinks ShopifyAttribution[]
   submissions  ContentSubmission[]
   invoices     Invoice[]
+
+  // El cobro que respalda esta colaboracion.
+  stripePaymentIntent String?
+  // Agrupa en Stripe el cobro con su transferencia. Es una etiqueta para
+  // poder reconciliar: no retiene nada por si misma.
+  stripeTransferGroup String?
 }
 
 // Una entrega de contenido para que la empresa la revise.
@@ -466,13 +490,27 @@ model Invoice {
 }
 
 model Payment {
-  id        String   @id @default(cuid())
-  dealId    String
-  deal      Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
-  amount    Int
-  fee       Int
-  kind      String // ESCROW_IN | PAYOUT | REFUND
-  status    String   @default("COMPLETED")
+  id     String @id @default(cuid())
+  dealId String
+  deal   Deal   @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  amount Int
+  fee    Int
+  kind   String // ESCROW_IN | PAYOUT | REFUND
+  status String @default("COMPLETED") // PENDING | COMPLETED | FAILED
+
+  // Hasta ahora estas filas eran la unica realidad: se escribia "ESCROW_IN"
+  // y no se movia un euro. Ahora cada una apunta al objeto de Stripe que la
+  // respalda. SIMULATED existe para desarrollo y para que la aplicacion
+  // funcione sin credenciales, pero la interfaz tiene que decirlo cuando lo
+  // use: prometer una garantia que no existe es peor que no tenerla.
+  provider  String   @default("SIMULATED") // STRIPE | SIMULATED
+  // pi_... un cobro, tr_... una transferencia, re_... una devolucion.
+  stripeId  String?
+  // Lo que Stripe cobra por el movimiento. Sale de nuestra comision, no del
+  // creador: la empresa paga el precio acordado y el creador recibe su 88%
+  // pase lo que pase.
+  stripeFee Int      @default(0)
+  error     String?
   reference String?
   createdAt DateTime @default(now())
 }
@@ -717,4 +755,17 @@ model ShopifyWebhookEvent {
   receivedAt DateTime @default(now())
 
   @@index([receivedAt])
+}
+
+// Eventos de Stripe ya procesados.
+//
+// Stripe entrega "al menos una vez", igual que Shopify: sin esta tabla, un
+// reintento del aviso de cobro marcaria dos veces la misma colaboracion como
+// pagada. Con dinero de por medio eso no es un duplicado cosmetico.
+model StripeEvent {
+  id        String   @id // el id del evento, tal cual
+  type      String
+  createdAt DateTime @default(now())
+
+  @@index([type])
 }

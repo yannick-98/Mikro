@@ -23,8 +23,9 @@
     "test:social": "node backend/scripts/social-test.js",
     "social:sync": "node backend/scripts/social-sync.js",
     "test:tools": "node backend/scripts/tools-test.js",
-    "test": "npm run test:shopify && npm run test:social && npm run test:tools",
-    "youtube:check": "node backend/scripts/youtube-check.js"
+    "test": "npm run test:shopify && npm run test:social && npm run test:tools && npm run test:stripe",
+    "youtube:check": "node backend/scripts/youtube-check.js",
+    "test:stripe": "node backend/scripts/stripe-test.js"
   },
   "dependencies": {
     "@fontsource/inter": "^5.1.0",
@@ -42,6 +43,7 @@
     "react-router-dom": "^6.28.0",
     "recharts": "^2.13.3",
     "serverless-http": "^3.2.0",
+    "stripe": "^17.4.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {

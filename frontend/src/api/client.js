@@ -136,6 +136,13 @@ export const api = {
   mediaKit: (handle) => request(`/mediakit/${handle}`),
   issueInvoices: (dealId) => request(`/deals/${dealId}/invoices`, { method: 'POST' }),
 
+  // Cobros
+  stripeEstado: () => request('/stripe/estado'),
+  miCuentaCobros: () => request('/stripe/cuenta'),
+  empezarAltaCobros: () => request('/stripe/cuenta', { method: 'POST' }),
+  refrescarCobros: () => request('/stripe/cuenta/refrescar', { method: 'POST' }),
+  panelCobros: () => request('/stripe/cuenta/panel'),
+
   // Envio del producto al creador
   setShipping: (dealId, payload) => request(`/deals/${dealId}/shipping`, { method: 'PUT', body: payload }),
   markShipped: (dealId, payload) => request(`/deals/${dealId}/shipment/sent`, { method: 'POST', body: payload }),

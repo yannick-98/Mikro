@@ -9,6 +9,7 @@ import { PlatformIcon, Spinner, Thumb, Toast, useAsync, useToast } from '../../c
 import { formatFollowers } from '../../lib/format'
 import ConectarRedes from '../../components/ConectarRedes'
 import AvisosYFacturacion from '../../components/AvisosYFacturacion'
+import CobrosCreador from '../../components/CobrosCreador'
 import { CREATOR_NAV } from './nav'
 
 const PLATFORMS = ['instagram', 'tiktok', 'youtube']
@@ -480,6 +481,7 @@ export default function EditCreatorProfile() {
           </div>
         </form>
 
+        <CobrosCreador show={show} />
         <ConectarRedes show={show} onCambio={reload} />
         <SocialEditor creator={creator} onChange={(c) => setData({ creator: c })} show={show} />
         <PortfolioEditor creator={creator} onChange={(c) => setData({ creator: c })} show={show} />
