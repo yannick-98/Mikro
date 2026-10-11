@@ -4,6 +4,7 @@ import { Briefcase, Check, Package, Send } from 'lucide-react'
 import { api } from '../../api/client'
 import { DashboardShell } from '../../components/Dashboard'
 import { Avatar, EmptyState, Modal, Spinner, Toast, useAsync, useToast } from '../../components/ui'
+import PrecioReferencia from '../../components/PrecioReferencia'
 import { formatDate, formatEuro, formatFollowers } from '../../lib/format'
 import { CREATOR_NAV } from './nav'
 
@@ -54,6 +55,9 @@ function ApplyModal({ campaign, onClose, onDone }) {
             <p className="mt-1.5 text-[12px] text-ink/45">
               Recibiras {formatEuro(Math.round(Number(fee) * 0.88))} despues de la comision del 12%.
             </p>
+            {/* Aqui es donde el creador decide su precio, y donde hoy se
+                malvende por no saber lo que cobran los demas. */}
+            <PrecioReferencia mio className="mt-3" onUsar={(ref) => setFee(ref.mediana)} />
           </div>
 
           <div>

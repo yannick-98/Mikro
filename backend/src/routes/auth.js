@@ -119,6 +119,12 @@ router.get(
 const updateMeSchema = z.object({
   name: z.string().min(2).optional(),
   avatarUrl: z.string().url().optional().or(z.literal('')),
+  // El telefono se guarda vacio como null y no como cadena vacia: asi "no
+  // tengo telefono" es un solo estado y no dos.
+  phone: z.string().trim().max(30).optional().or(z.literal('')),
+  // El permiso para escribir por WhatsApp. Nunca viene puesto de serie: lo
+  // marca la persona o no existe.
+  whatsappOptIn: z.boolean().optional(),
 })
 
 router.patch(
@@ -126,6 +132,9 @@ router.patch(
   requireAuth,
   asyncHandler(async (req, res) => {
     const data = parseBody(updateMeSchema, req.body)
+    if (data.phone === '') data.phone = null
+    // Sin telefono no hay a donde escribir, asi que el permiso se cae solo.
+    if (data.phone === null) data.whatsappOptIn = false
     const user = await prisma.user.update({
       where: { id: req.user.id },
       data,

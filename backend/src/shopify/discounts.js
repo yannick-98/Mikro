@@ -58,8 +58,13 @@ export function buildCode(handle, prefix = 'MIKRO') {
     .replace(/[^A-Z0-9]/g, '')
     .slice(0, 10)
 
+  // Cinco caracteres y no cuatro. Con cuatro habia 31^4 = 923.000
+  // combinaciones, que suena a mucho y no lo es: por la paradoja del
+  // cumpleanios, 300 codigos ya chocan una vez de cada veinte. La unicidad de
+  // verdad la garantiza la clave unica de la base; esto solo tiene que hacer
+  // el choque raro, y con cinco pasa a 28 millones.
   const alfabeto = '0123456789BCDFGHJKLMNPQRSTVWXYZ'
-  const bytes = crypto.randomBytes(4)
+  const bytes = crypto.randomBytes(5)
   const sufijo = Array.from(bytes, (b) => alfabeto[b % alfabeto.length]).join('')
 
   return `${prefix}-${base || 'CREADOR'}-${sufijo}`

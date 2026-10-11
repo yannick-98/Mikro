@@ -81,6 +81,25 @@ function resumir(importes) {
 const ESTADOS_VALIDOS = ['APPROVED', 'PAID', 'SUBMITTED', 'IN_PROGRESS', 'FUNDED']
 
 /**
+ * Los niveles de precision que tiene sentido intentar, de mas fino a mas
+ * grueso.
+ *
+ * Solo se incluyen los que usan criterios que de verdad nos han dado. Si
+ * nadie nos ha dicho el sector, el resultado no puede presentarse como "en tu
+ * sector": seria afirmar una precision que no existe, y en una cifra que la
+ * gente usa para negociar eso no es un matiz. Aparte por ser la parte que se
+ * puede probar sin base de datos.
+ */
+export function elegirNiveles({ sector, city, tramo } = {}) {
+  const niveles = []
+  if (sector && city && tramo) niveles.push('sector-ciudad-tramo')
+  if (sector) niveles.push('sector-tramo')
+  if (tramo) niveles.push('tramo')
+  niveles.push('general')
+  return niveles
+}
+
+/**
  * Precio de referencia para unos criterios.
  *
  * Va bajando de precision hasta encontrar muestra: sector y ciudad y tramo ->
@@ -117,12 +136,15 @@ export async function precioDeReferencia({ sector, city, followers, engagement }
     (d.brand?.city || '').toLowerCase() === String(city).toLowerCase() ||
     (d.creator?.city || '').toLowerCase() === String(city).toLowerCase()
 
-  const niveles = [
-    { nivel: 'sector-ciudad-tramo', filtro: (d) => mismoSector(d) && mismaCiudad(d) && enTramo(d) },
-    { nivel: 'sector-tramo', filtro: (d) => mismoSector(d) && enTramo(d) },
-    { nivel: 'tramo', filtro: enTramo },
-    { nivel: 'general', filtro: () => true },
-  ]
+  const niveles = elegirNiveles({ sector, city, tramo }).map((nivel) => ({
+    nivel,
+    filtro: {
+      'sector-ciudad-tramo': (d) => mismoSector(d) && mismaCiudad(d) && enTramo(d),
+      'sector-tramo': (d) => mismoSector(d) && enTramo(d),
+      tramo: enTramo,
+      general: () => true,
+    }[nivel],
+  }))
 
   for (const { nivel, filtro } of niveles) {
     const importes = deals.filter(filtro).map((d) => d.fee)
@@ -173,6 +195,13 @@ export function explicar(ref) {
     tramo: `para perfiles de ${ref.tramo}`,
     general: `en Mikro`,
   }[ref.nivel]
+
+  // Cuando casi todo se cierra al mismo precio, los tres cuartiles coinciden
+  // y "entre 250 y 250 euros" se lee como un error. Es un mercado concentrado,
+  // no un fallo, y se cuenta como lo que es.
+  if (ref.min === ref.max) {
+    return `Casi todas las colaboraciones ${donde} se cerraron en ${ref.mediana} €. Sobre ${ref.muestra} colaboraciones, de ${ref.minimoVisto} a ${ref.maximoVisto} € en total.`
+  }
   return `La mitad de las colaboraciones ${donde} se cerraron entre ${ref.min} y ${ref.max} €, con ${ref.mediana} € de mediana. Sobre ${ref.muestra} colaboraciones.`
 }
 

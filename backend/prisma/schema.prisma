@@ -558,7 +558,7 @@ model ShopifyAttribution {
   dealId     String?
   deal       Deal?     @relation(fields: [dealId], references: [id], onDelete: SetNull)
 
-  code        String // MIKRO-MARTA-7F3K
+  code        String // MIKRO-MARTA-7F3KQ
   discountGid String? // el descuento creado en Shopify
   percentage  Int       @default(10)
   // Destino del enlace que se comparte, guardado como ruta de la tienda

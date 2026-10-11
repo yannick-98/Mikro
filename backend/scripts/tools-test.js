@@ -8,7 +8,9 @@
  * presenta una estimacion como si fuera un dato, un brief que se come lo que
  * escribio la empresa.
  */
-const { tarifaOrientativa, tramoDe, explicar, TRAMOS } = await import('../src/services/pricing.js')
+const { tarifaOrientativa, tramoDe, explicar, elegirNiveles, TRAMOS } = await import(
+  '../src/services/pricing.js'
+)
 const { calcular, IVA } = await import('../src/services/invoice.js')
 const { redactarBrief, PREGUNTAS } = await import('../src/services/brief.js')
 
@@ -46,10 +48,49 @@ check(
 check('hay un suelo de 60 EUR', tarifaOrientativa({ followers: 300 }).centro >= 60)
 check('sin datos no revienta', tarifaOrientativa().centro >= 60)
 
-console.log('\n--- Como se cuenta lo que se sabe ---')
+console.log('\n--- Que precision se puede prometer ---')
+
+// Lo que fallaba: sin sector ni ciudad, el resultado se presentaba igualmente
+// como "en tu sector y tu ciudad". Una cifra con la que la gente negocia no
+// puede afirmar una precision que no tiene.
+check('sin criterios, solo el general', elegirNiveles({}).join() === 'general')
+check(
+  'con tramo pero sin sector, nada de sector',
+  !elegirNiveles({ tramo: { id: '10k-30k' } }).some((n) => n.includes('sector')),
+)
+check(
+  'con sector pero sin ciudad, nada de ciudad',
+  !elegirNiveles({ sector: 'Moda', tramo: {} }).some((n) => n.includes('ciudad')),
+)
+check(
+  'con todo, se intenta lo mas fino primero',
+  elegirNiveles({ sector: 'Moda', city: 'Valencia', tramo: {} })[0] === 'sector-ciudad-tramo',
+)
+check(
+  'siempre queda el general como ultimo recurso',
+  elegirNiveles({ sector: 'Moda', city: 'Valencia', tramo: {} }).at(-1) === 'general',
+)
+
+console.log('--- Como se cuenta lo que se sabe ---')
 
 const dato = { origen: 'mercado', nivel: 'sector-ciudad-tribu', min: 180, max: 260, mediana: 220, muestra: 31 }
 check('un dato de mercado cita la muestra', explicar(dato).includes('31 colaboraciones'))
+
+const colapsado = {
+  origen: 'mercado',
+  nivel: 'tramo',
+  tramo: '10K-30K',
+  min: 250,
+  max: 250,
+  mediana: 250,
+  muestra: 14,
+  minimoVisto: 250,
+  maximoVisto: 394,
+}
+const textoColapsado = explicar(colapsado)
+check('un rango colapsado no dice "entre 250 y 250"', !textoColapsado.includes('entre 250 y 250'))
+check('lo cuenta como un precio unico', textoColapsado.includes('se cerraron en 250'))
+check('y ensena los extremos reales', textoColapsado.includes('de 250 a 394'))
 
 const estimado = {
   origen: 'estimacion',
@@ -123,6 +164,32 @@ check('avisa si falta el publico', flojo.consejos.some((c) => c.includes('a qui�
 check('avisa de un presupuesto bajo', flojo.consejos.some((c) => c.includes('60')))
 check('avisa de un precio cerrado', flojo.consejos.some((c) => c.includes('rango')))
 check('aun sin publico produce un brief', flojo.brief.length > 150)
+
+// El titulo salia cortado a mitad de palabra ("...recién salida…") y con la
+// ciudad pegada detras de los puntos suspensivos.
+const titulo = (producto, objetivo = 'notoriedad') =>
+  redactarBrief({
+    respuestas: { producto, objetivo },
+    brand: { companyName: 'Prueba' },
+    campaign: { targetCity: 'Valencia' },
+  }).titulo
+
+check('el titulo no parte palabras', !/\w…$/.test(titulo('nuestra masa madre de espelta, recién salida del horno')))
+check(
+  'se queda con el primer inciso',
+  titulo('nuestra masa madre de espelta, recién salida del horno', 'ventas') ===
+    'Da a conocer nuestra masa madre de espelta',
+)
+check('ningun titulo pasa de 60 caracteres', [
+  'nuestra masa madre de espelta, recién salida del horno',
+  'el nuevo gimnasio del barrio de Russafa con su sala de ciclo indoor y entrenadores',
+  'la colección de otoño',
+].every((p) => titulo(p).length <= 60))
+check(
+  'un titulo recortado no lleva la ciudad detras',
+  !titulo('el nuevo gimnasio del barrio de Russafa con su sala de ciclo indoor').includes('…, en'),
+)
+check('empieza por mayuscula', /^[A-ZÁÉÍÓÚÑ]/.test(titulo('nuestra tienda de flores')))
 
 check('las preguntas requeridas son tres', PREGUNTAS.filter((p) => p.requerida).length === 3)
 check(

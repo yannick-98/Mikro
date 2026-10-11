@@ -20,7 +20,7 @@ Tres cosas, en este orden:
 ## Cómo se atribuye una venta
 
 **Por código de descuento, no por enlace.** Cada creador de una campaña recibe uno
-propio (`MIKRO-MARTA-7F3K`). Cuando entra un pedido con ese código, la venta es de esa
+propio (`MIKRO-MARTA-7F3KQ`). Cuando entra un pedido con ese código, la venta es de esa
 colaboración.
 
 Es la decisión de diseño más importante de la integración, y va contra lo habitual:

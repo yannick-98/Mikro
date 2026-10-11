@@ -27,6 +27,8 @@ const updateBrandSchema = z.object({
   teamSize: z.string().optional(),
   monthlyBudget: z.number().min(0).optional(),
   vatNumber: z.string().optional(),
+  // Domicilio fiscal: hace falta en la factura que recibe de cada creador.
+  billingAddress: z.string().trim().max(200).optional(),
 })
 
 router.patch(

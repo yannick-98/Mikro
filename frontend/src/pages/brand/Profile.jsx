@@ -3,6 +3,7 @@ import { api } from '../../api/client'
 import { useAuth } from '../../store/auth'
 import { DashboardShell } from '../../components/Dashboard'
 import { Spinner, Toast, useAsync, useToast } from '../../components/ui'
+import AvisosYFacturacion from '../../components/AvisosYFacturacion'
 import { BRAND_NAV } from './nav'
 
 const TEAM_SIZES = ['1-5', '6-20', '21-50', '50+']
@@ -34,6 +35,7 @@ export default function BrandProfile() {
         teamSize: form.teamSize || undefined,
         monthlyBudget: form.monthlyBudget ? Number(form.monthlyBudget) : undefined,
         vatNumber: form.vatNumber || undefined,
+        billingAddress: form.billingAddress || undefined,
       })
       await refresh()
       show.success('Datos guardados')
@@ -130,6 +132,18 @@ export default function BrandProfile() {
           </div>
         </div>
 
+        <div>
+          {/* Hace falta para la factura que recibes de cada creador: sin
+              domicilio fiscal, el documento no vale para tu contabilidad. */}
+          <label className="label">Domicilio fiscal</label>
+          <input
+            value={form.billingAddress || ''}
+            onChange={set('billingAddress')}
+            className="field"
+            placeholder="C/ Ejemplo 12, 46001 Valencia"
+          />
+        </div>
+
         <div className="flex items-center gap-3 border-t border-black/[0.06] pt-5">
           <button type="submit" disabled={saving} className="btn-primary">
             {saving ? <Spinner size={16} /> : null}
@@ -142,6 +156,11 @@ export default function BrandProfile() {
           )}
         </div>
       </form>
+
+      <div className="mt-5">
+        <AvisosYFacturacion show={show} />
+      </div>
+
       <Toast toast={toast} onDismiss={dismiss} />
     </DashboardShell>
   )

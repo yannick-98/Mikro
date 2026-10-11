@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import clsx from 'clsx'
-import { Eye, Plus, Trash2 } from 'lucide-react'
+import { Eye, IdCard, Plus, Trash2 } from 'lucide-react'
 import { api } from '../../api/client'
 import { useAuth } from '../../store/auth'
 import { DashboardShell } from '../../components/Dashboard'
 import { PlatformIcon, Spinner, Thumb, Toast, useAsync, useToast } from '../../components/ui'
 import { formatFollowers } from '../../lib/format'
+import ConectarRedes from '../../components/ConectarRedes'
+import AvisosYFacturacion from '../../components/AvisosYFacturacion'
 import { CREATOR_NAV } from './nav'
 
 const PLATFORMS = ['instagram', 'tiktok', 'youtube']
@@ -65,9 +67,11 @@ function SocialEditor({ creator, onChange, show }) {
 
   return (
     <section className="card p-6">
-      <h2 className="text-[16px] font-extrabold tracking-tight">Mis redes</h2>
-      <p className="mt-1 text-[13.5px] text-ink/55">
-        Los datos que declares aqui alimentan tu posicion en el ranking y el match con las campanas.
+      <h2 className="text-[16px] font-extrabold tracking-tight">Ponerlas a mano</h2>
+      <p className="mt-1 max-w-xl text-[13.5px] leading-relaxed text-ink/55">
+        Si todavía no puedes conectar una cuenta, escribe aquí tus cifras. Funcionan igual para el
+        match con las campañas, pero en tu perfil aparecerán como declaradas por ti, no comprobadas:
+        es lo justo con quien sí las ha comprobado.
       </p>
 
       <div className="mt-4 flex gap-2">
@@ -235,7 +239,7 @@ function PortfolioEditor({ creator, onChange, show }) {
 export default function EditCreatorProfile() {
   const { refresh } = useAuth()
   const { toast, show, dismiss } = useToast()
-  const { data, loading, setData } = useAsync(() => api.myCreator(), [])
+  const { data, loading, setData, reload } = useAsync(() => api.myCreator(), [])
   const { data: facets } = useAsync(() => api.facets(), [])
   const [form, setForm] = useState(null)
   const [saving, setSaving] = useState(false)
@@ -316,9 +320,17 @@ export default function EditCreatorProfile() {
       subtitle="Asi te ven las marcas. Cuanto mas completo, mas propuestas recibes."
       nav={CREATOR_NAV}
       actions={
-        <Link to={`/creador/${creator.handle}`} className="btn-ghost">
-          <Eye size={15} /> Ver perfil publico
-        </Link>
+        <span className="flex flex-wrap gap-2">
+          {/* El media kit es la carta de presentacion que el creador pega en
+              su bio. Esta aqui arriba porque es lo que de verdad va a usar a
+              diario, mas que el perfil de dentro. */}
+          <Link to={`/kit/${creator.handle}`} className="btn-primary">
+            <IdCard size={15} /> Mi media kit
+          </Link>
+          <Link to={`/creador/${creator.handle}`} className="btn-ghost">
+            <Eye size={15} /> Ver perfil publico
+          </Link>
+        </span>
       }
     >
       <div className="space-y-5">
@@ -468,8 +480,14 @@ export default function EditCreatorProfile() {
           </div>
         </form>
 
+        <ConectarRedes show={show} onCambio={reload} />
         <SocialEditor creator={creator} onChange={(c) => setData({ creator: c })} show={show} />
         <PortfolioEditor creator={creator} onChange={(c) => setData({ creator: c })} show={show} />
+        <AvisosYFacturacion
+          creator={creator}
+          onCreator={(c) => setData({ creator: c })}
+          show={show}
+        />
       </div>
 
       <Toast toast={toast} onDismiss={dismiss} />

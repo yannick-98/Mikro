@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import clsx from 'clsx'
-import { ArrowRight, Check, ExternalLink, Handshake, Link2, Send, ShieldCheck, Star, Wallet } from 'lucide-react'
+import { ArrowRight, Check, ExternalLink, Handshake, Link2, RotateCcw, Send, ShieldCheck, Star, Wallet } from 'lucide-react'
 import { api } from '../api/client'
 import { Avatar, EmptyState, Modal, Spinner, Toast, useAsync, useToast } from './ui'
 import { StatusPill } from './Dashboard'
+import EntregasYFacturas from './EntregasYFacturas'
 import { DEAL_STATUS, formatEuro, formatRelative } from '../lib/format'
 
 /** Acciones disponibles en cada estado, por rol. */
@@ -205,7 +206,54 @@ function ReviewModal({ open, onClose, deal, onSubmit }) {
  * Lista y gestion de colaboraciones. La comparten empresa y creador: cambian
  * las acciones disponibles, no la informacion.
  */
+/**
+ * Pedir cambios sobre una entrega.
+ *
+ * Existe porque antes la empresa solo podia aprobar o no hacer nada, y no
+ * hacer nada con el dinero retenido es la peor forma posible de decir que algo
+ * no encaja: el creador se queda esperando sin saber que arreglar.
+ */
+function CambiosModal({ open, onClose, onSubmit }) {
+  const [feedback, setFeedback] = useState('')
+  const [enviando, setEnviando] = useState(false)
+
+  return (
+    <Modal open={open} onClose={onClose} title="Pedir cambios">
+      <form
+        className="space-y-4"
+        onSubmit={async (e) => {
+          e.preventDefault()
+          setEnviando(true)
+          await onSubmit({ feedback })
+          setEnviando(false)
+          setFeedback('')
+        }}
+      >
+        <div>
+          <label className="label">Qué hay que cambiar</label>
+          <textarea
+            required
+            rows={4}
+            value={feedback}
+            onChange={(e) => setFeedback(e.target.value)}
+            className="field resize-none"
+            placeholder="El plano del producto sale muy oscuro y no se lee la etiqueta. ¿Puedes repetirlo con luz natural?"
+          />
+          <p className="mt-1.5 text-[12px] text-ink/45">
+            Queda escrito junto a la versión entregada. Concreto y amable: la otra persona quiere
+            acertar.
+          </p>
+        </div>
+        <button type="submit" disabled={enviando || !feedback.trim()} className="btn-primary w-full !py-3">
+          {enviando ? <Spinner size={16} /> : null} Enviar al creador
+        </button>
+      </form>
+    </Modal>
+  )
+}
+
 export default function DealsView({ role, meId }) {
+  const [cambiosOpen, setCambiosOpen] = useState(false)
   const { toast, show, dismiss } = useToast()
   const { data, loading, reload } = useAsync(() => api.deals(), [])
   const [selected, setSelected] = useState(null)
@@ -244,6 +292,7 @@ export default function DealsView({ role, meId }) {
         submit: 'Contenido entregado',
         approve: 'Contenido aprobado',
         release: 'Pago liberado al creador',
+        changes: 'Le hemos pedido los cambios al creador',
         cancel: 'Colaboracion cancelada',
       }
       show.success(labels[action])
@@ -404,6 +453,20 @@ export default function DealsView({ role, meId }) {
                     </button>
                   ) : null}
 
+                  {role === 'BRAND' && d.status === 'SUBMITTED' ? (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => {
+                        setSelected(d.id)
+                        setCambiosOpen(true)
+                      }}
+                      className="btn-ghost !px-3.5 !py-2 !text-[12.5px]"
+                    >
+                      <RotateCcw size={14} /> Pedir cambios
+                    </button>
+                  ) : null}
+
                   {role === 'CREATOR' && d.status === 'FUNDED' ? (
                     <button
                       type="button"
@@ -452,7 +515,8 @@ export default function DealsView({ role, meId }) {
                 </div>
 
                 {selected === d.id && detail ? (
-                  <div className="mt-4 rounded-2xl border border-black/[0.06] bg-black/[0.015] p-4">
+                  <div className="mt-4 space-y-5 rounded-2xl border border-black/[0.06] bg-black/[0.015] p-4">
+                    <EntregasYFacturas deal={d} role={role} onCambio={reload} show={show} />
                     <Chat
                       deal={d}
                       meId={meId}
@@ -493,6 +557,17 @@ export default function DealsView({ role, meId }) {
           } catch (e) {
             show.error(e.message)
           }
+        }}
+      />
+
+      <CambiosModal
+        open={cambiosOpen}
+        onClose={() => setCambiosOpen(false)}
+        onSubmit={async (payload) => {
+          const deal = (data?.items || []).find((x) => x.id === selected)
+          if (!deal) return
+          const ok = await act(deal, 'changes', payload)
+          if (ok) setCambiosOpen(false)
         }}
       />
 

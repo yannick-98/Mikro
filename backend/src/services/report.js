@@ -86,9 +86,16 @@ export async function informeDeCampana(campaignId, { brandId } = {}) {
   // que entregaron.
   const cuentas = deals.flatMap((d) => d.creator?.socialAccounts || []).map((a) => a.id)
 
+  // Acotada por fecha y por numero: solo hace falta encontrar la publicacion
+  // que entrego cada creador, no su historial entero. Sin el limite, una
+  // campana con varios creadores activos se traia miles de filas para casar
+  // cuatro enlaces.
+  const desde = new Date(campaign.createdAt.getTime() - 30 * 86400000)
   const posts = cuentas.length
     ? await prisma.socialPost.findMany({
-        where: { accountId: { in: cuentas } },
+        where: { accountId: { in: cuentas }, publishedAt: { gte: desde } },
+        orderBy: { publishedAt: 'desc' },
+        take: 400,
         select: {
           permalink: true,
           likes: true,

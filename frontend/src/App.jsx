@@ -8,6 +8,7 @@ import Discover from './pages/Discover'
 import Rankings from './pages/Rankings'
 import CreatorProfile from './pages/CreatorProfile'
 import Resources from './pages/Resources'
+import MediaKit from './pages/MediaKit'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import ShopifyApp from './pages/ShopifyApp'
@@ -17,6 +18,7 @@ import NotFound from './pages/NotFound'
 import BrandDashboard from './pages/brand/Dashboard'
 import BrandCampaigns from './pages/brand/Campaigns'
 import CampaignDetail from './pages/brand/CampaignDetail'
+import CampaignReport from './pages/brand/CampaignReport'
 import BrandDeals from './pages/brand/Deals'
 import BrandSaved from './pages/brand/Saved'
 import BrandProfile from './pages/brand/Profile'
@@ -82,6 +84,10 @@ export default function App() {
         <Route path="/" element={<Entrada />} />
         <Route path="/rankings" element={<Rankings />} />
         <Route path="/recursos" element={<Resources />} />
+        {/* El media kit es publico a proposito: se pega en una bio de
+            Instagram y lo abre quien no tiene cuenta. Es la carta de
+            presentacion del creador y, de paso, nuestra mejor captacion. */}
+        <Route path="/kit/:handle" element={<MediaKit />} />
         <Route path="/aviso-legal" element={<AvisoLegal />} />
         <Route path="/privacidad" element={<Privacidad />} />
         <Route path="/entrar" element={<Login />} />
@@ -103,6 +109,7 @@ export default function App() {
         <Route path="/empresa" element={<Protected roles={['BRAND']}><BrandDashboard /></Protected>} />
         <Route path="/empresa/campanas" element={<Protected roles={['BRAND']}><BrandCampaigns /></Protected>} />
         <Route path="/empresa/campanas/:id" element={<Protected roles={['BRAND']}><CampaignDetail /></Protected>} />
+        <Route path="/empresa/campanas/:id/informe" element={<Protected roles={['BRAND']}><CampaignReport /></Protected>} />
         <Route path="/empresa/colaboraciones" element={<Protected roles={['BRAND']}><BrandDeals /></Protected>} />
         <Route path="/empresa/guardados" element={<Protected roles={['BRAND']}><BrandSaved /></Protected>} />
         <Route path="/empresa/perfil" element={<Protected roles={['BRAND']}><BrandProfile /></Protected>} />

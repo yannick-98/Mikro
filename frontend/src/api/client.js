@@ -118,6 +118,24 @@ export const api = {
   notifications: () => request('/notifications'),
   readNotifications: () => request('/notifications/read', { method: 'POST' }),
 
+  // Cuentas de redes del creador: lo que convierte las cifras declaradas en
+  // cifras comprobadas.
+  socialPlatforms: () => request('/social/platforms'),
+  mySocial: () => request('/social/me'),
+  connectSocial: (platform) => request(`/social/${platform}/connect`, { method: 'POST' }),
+  connectYoutube: (canal) => request('/social/youtube', { method: 'POST', body: { canal } }),
+  syncSocial: (platform) => request(`/social/${platform}/sync`, { method: 'POST' }),
+  disconnectSocial: (platform) => request(`/social/${platform}`, { method: 'DELETE' }),
+
+  // Herramientas
+  pricing: (params) => request(`/pricing${qs(params)}`),
+  myPricing: () => request('/pricing/me'),
+  campaignReport: (id) => request(`/campaigns/${id}/report`),
+  briefQuestions: () => request('/brief/questions'),
+  writeBrief: (payload) => request('/brief', { method: 'POST', body: payload }),
+  mediaKit: (handle) => request(`/mediakit/${handle}`),
+  issueInvoices: (dealId) => request(`/deals/${dealId}/invoices`, { method: 'POST' }),
+
   // Backoffice
   adminOverview: () => request('/admin/overview'),
   verifyCreator: (id, verified) => request(`/admin/creators/${id}/verify`, { method: 'POST', body: { verified } }),

@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { prisma } from '../lib/prisma.js'
 import { asyncHandler, forbidden, notFound, parseBody } from '../lib/http.js'
 import { requireAuth, requireRole } from '../middleware/auth.js'
-import { publicCreator } from '../services/serialize.js'
+import { privateCreator, publicCreator } from '../services/serialize.js'
 import { matchScore, computeScore } from '../services/scoring.js'
 import { normalize } from '../services/taxonomy.js'
 import { recomputeCreator } from '../services/creatorStats.js'
@@ -186,7 +186,7 @@ router.get(
       where: { userId: req.user.id },
       include: CREATOR_INCLUDE,
     })
-    res.json({ creator: publicCreator(creator) })
+    res.json({ creator: privateCreator(creator) })
   }),
 )
 
@@ -205,6 +205,12 @@ const updateCreatorSchema = z.object({
   audienceCountry: z.string().optional(),
   audienceFemalePct: z.number().min(0).max(100).optional(),
   audienceAgeRange: z.string().optional(),
+  // Datos fiscales, para poder emitir sus facturas sin que las haga a mano.
+  taxId: z.string().trim().max(20).optional(),
+  billingAddress: z.string().trim().max(200).optional(),
+  // 15% es lo habitual; 7% los tres primeros anios de actividad; 0 si no
+  // procede. Lo elige el creador porque solo el sabe en que caso esta.
+  irpfRate: z.number().int().min(0).max(21).optional(),
   ratePost: z.number().min(0).optional(),
   rateReel: z.number().min(0).optional(),
   rateStory: z.number().min(0).optional(),
@@ -219,7 +225,7 @@ router.patch(
     const data = parseBody(updateCreatorSchema, req.body)
     await prisma.creator.update({ where: { userId: req.user.id }, data })
     const creator = await recomputeCreator(req.user.creator.id)
-    res.json({ creator: publicCreator(creator) })
+    res.json({ creator: privateCreator(creator) })
   }),
 )
 
@@ -244,7 +250,7 @@ router.put(
       create: { ...data, creatorId },
     })
     const creator = await recomputeCreator(creatorId)
-    res.json({ creator: publicCreator(creator) })
+    res.json({ creator: privateCreator(creator) })
   }),
 )
 
@@ -255,7 +261,7 @@ router.delete(
     const creatorId = req.user.creator.id
     await prisma.socialAccount.deleteMany({ where: { creatorId, platform: req.params.platform } })
     const creator = await recomputeCreator(creatorId)
-    res.json({ creator: publicCreator(creator) })
+    res.json({ creator: privateCreator(creator) })
   }),
 )
 

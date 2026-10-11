@@ -130,11 +130,22 @@ check('subdominio enganoso rechazado', toShopDomain('mi-tienda.myshopify.com.evi
 console.log('\n--- Codigos de descuento ---')
 
 const codigo = buildCode('marta.garcia')
-check('formato del codigo', /^MIKRO-[A-Z0-9]{1,10}-[A-Z0-9]{4}$/.test(codigo), codigo)
+check('formato del codigo', /^MIKRO-[A-Z0-9]{1,10}-[A-Z0-9]{5}$/.test(codigo), codigo)
 check('acentos y puntos fuera', buildCode('josé.lópez').startsWith('MIKRO-JOSELOPEZ-'), buildCode('josé.lópez'))
 check('sin handle sigue dando codigo', /^MIKRO-CREADOR-/.test(buildCode('')))
-const muestras = new Set(Array.from({ length: 300 }, () => buildCode('marta')))
-check('los codigos no se repiten', muestras.size === 300, `${muestras.size}/300`)
+
+// Antes esto exigia 300 de 300 distintos, que es una promesa que ningun
+// generador aleatorio puede cumplir: fallaba una vez de cada veinte y parecia
+// una prueba nerviosa. Era un aviso de verdad. Con cuatro caracteres habia
+// 923.000 combinaciones y por la paradoja del cumpleanios 300 codigos ya
+// chocan el 5% de las veces; ahora son cinco caracteres y 28 millones.
+// Lo que se comprueba es que el choque sea raro, no que sea imposible: la
+// unicidad la garantiza la clave unica de la base, no el azar.
+const MUESTRAS = 2000
+const muestras = new Set(Array.from({ length: MUESTRAS }, () => buildCode('marta')))
+const repetidos = MUESTRAS - muestras.size
+check('los choques son raros', repetidos <= 2, `${repetidos} repetidos de ${MUESTRAS}`)
+check('el sufijo usa todo el alfabeto', new Set([...muestras].map((c) => c.at(-1))).size >= 25)
 
 // ---------------------------------------------------------------------------
 console.log('\n--- Enlaces para compartir ---')

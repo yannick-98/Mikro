@@ -373,6 +373,15 @@ export function Privacidad() {
         los comunicaríamos a la Administración o a los tribunales si una norma nos obligara.
       </P>
 
+      <P>
+        <strong>Si conectas una red social</strong> (opcional, y solo si tú lo pides): guardamos el
+        identificador de tu cuenta, tu número de seguidores y, de tus últimas publicaciones, la
+        fecha, el enlace, la miniatura y los contadores de likes, comentarios y visualizaciones. Lo
+        usamos para calcular tu engagement y tu frecuencia de publicación. El permiso que pedimos
+        es de solo lectura: no publicamos nada ni accedemos a tus mensajes. Guardamos también el
+        token de acceso, cifrado. Si desconectas la cuenta, borramos todo eso.
+      </P>
+
       <H id="transferencias">5. Transferencias fuera del Espacio Económico Europeo</H>
       <P>
         La base de datos está en Irlanda, dentro de la Unión Europea: tus datos no salen del EEE
@@ -392,6 +401,11 @@ export function Privacidad() {
             'Shopify',
             'Normas Corporativas Vinculantes',
             'Los datos del EEE los trata Shopify International Ltd. (Irlanda); sus transferencias internas se amparan en sus NCV aprobadas, con las cláusulas de 2021 como salvaguarda adicional',
+          ],
+          [
+            'Meta, TikTok y Google',
+            'Solo si conectas esa red',
+            'Al conectar una cuenta, nuestro servidor habla con su API para leer tus cifras. La relación con esa plataforma es tuya y se rige por sus condiciones; nosotros solo usamos el permiso que tú das y puedes retirarlo cuando quieras',
           ],
         ]}
       />
@@ -422,7 +436,14 @@ export function Privacidad() {
       <P>
         La posición de un creador la decide una fórmula, no una persona. Pondera engagement (34%),
         número de seguidores en escala logarítmica (20%), valoraciones recibidas (18%),
-        colaboraciones cerradas (12%), rapidez de respuesta (8%) y perfil verificado (8%).
+        colaboraciones cerradas (12%), rapidez de respuesta (8%) y confianza del perfil (8%).
+      </P>
+      <P>
+        Dentro de ese último 8% pesa más tener las cifras comprobadas que la identidad verificada:
+        un perfil con las redes conectadas puntúa 85 sobre 100, uno solo con la identidad
+        verificada 70, y uno con las dos cosas, 100. Es deliberado: lo que una marca contrata son
+        las cifras, y las que vienen de la propia plataforma no se pueden inflar. Si tus cifras las
+        has escrito tú, se muestran como declaradas y puntúan 40.
       </P>
       <P>
         No produce efectos jurídicos ni decide sobre el acceso al servicio: afecta al orden en que

@@ -152,17 +152,38 @@ export function redactarBrief({ respuestas = {}, brand = {}, campaign = {} } = {
   }
 }
 
+/**
+ * Recorta sin partir palabras ni dejar frases a medias.
+ *
+ * Un titulo que acaba en "recién salida…" se lee como un error. Primero se
+ * busca el primer inciso (lo de antes de la coma), que casi siempre es el
+ * producto; si aun asi es largo, se corta por el ultimo espacio.
+ */
+function recortar(texto, max = 44) {
+  const primero = texto.split(/[,;]/)[0].trim()
+  const base = primero.length >= 8 ? primero : texto
+  if (base.length <= max) return base
+  const corte = base.slice(0, max)
+  return `${corte.slice(0, corte.lastIndexOf(' ')).trim() || corte.trim()}…`
+}
+
 function tituloSugerido(respuestas, { empresa, ciudad }) {
   const producto = sinPunto(respuestas.producto)
   if (!producto) return `Colaboración con ${empresa}`
-  const corto = producto.length > 48 ? `${producto.slice(0, 45).trim()}…` : producto
+  const corto = recortar(producto)
+  // Si ya hubo que recortar, no se le cuelga ademas la ciudad: el titulo
+  // acabaria en "…, en Valencia", que se lee como una frase rota.
+  const cola = ciudad && !corto.endsWith('…') ? `, en ${ciudad}` : ''
   const plantillas = {
     ventas: `Da a conocer ${corto}`,
-    notoriedad: `${corto}${ciudad ? `, en ${ciudad}` : ''}`,
+    notoriedad: `${mayuscula(corto)}${cola}`,
     lanzamiento: `Estrenamos ${corto}`,
     contenido: `Buscamos contenido de ${corto}`,
   }
   return plantillas[respuestas.objetivo] || plantillas.notoriedad
 }
+
+/** El titulo empieza por mayuscula aunque el producto se escribiera en minuscula. */
+const mayuscula = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s)
 
 export default { redactarBrief, PREGUNTAS }

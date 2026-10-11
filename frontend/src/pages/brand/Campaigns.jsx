@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import clsx from 'clsx'
-import { ArrowRight, Megaphone, Plus } from 'lucide-react'
+import { ArrowRight, BarChart3, Megaphone, Plus, Wand2 } from 'lucide-react'
 import { api } from '../../api/client'
 import { DashboardShell, StatusPill } from '../../components/Dashboard'
 import { EmptyState, Modal, Spinner, Toast, useAsync, useToast } from '../../components/ui'
+import AsistenteBrief from '../../components/AsistenteBrief'
+import PrecioReferencia from '../../components/PrecioReferencia'
 import { CAMPAIGN_STATUS, formatDate, formatEuro } from '../../lib/format'
 import { BRAND_NAV } from './nav'
 
@@ -32,6 +34,7 @@ const EMPTY = {
 }
 
 function CampaignForm({ open, onClose, onCreated, facets }) {
+  const [asistente, setAsistente] = useState(false)
   const [form, setForm] = useState(EMPTY)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
@@ -80,7 +83,16 @@ function CampaignForm({ open, onClose, onCreated, facets }) {
         </div>
 
         <div>
-          <label className="label">Brief</label>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <label className="label !mb-0">Brief</label>
+            <button
+              type="button"
+              onClick={() => setAsistente(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-brand-50 px-2.5 py-1 text-[12px] font-bold text-brand-700 transition hover:bg-brand-100"
+            >
+              <Wand2 size={13} /> Ayúdame a escribirlo
+            </button>
+          </div>
           <textarea
             required
             rows={5}
@@ -121,15 +133,24 @@ function CampaignForm({ open, onClose, onCreated, facets }) {
           <input required value={form.deliverables} onChange={set('deliverables')} className="field" placeholder="1 reel, 3 stories" />
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label className="label">Presupuesto minimo (EUR)</label>
-            <input type="number" min={0} value={form.budgetMin} onChange={setNum('budgetMin')} className="field" />
+        <div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className="label">Presupuesto minimo (EUR)</label>
+              <input type="number" min={0} value={form.budgetMin} onChange={setNum('budgetMin')} className="field" />
+            </div>
+            <div>
+              <label className="label">Presupuesto maximo (EUR)</label>
+              <input type="number" min={0} value={form.budgetMax} onChange={setNum('budgetMax')} className="field" />
+            </div>
           </div>
-          <div>
-            <label className="label">Presupuesto maximo (EUR)</label>
-            <input type="number" min={0} value={form.budgetMax} onChange={setNum('budgetMax')} className="field" />
-          </div>
+          {/* Aqui y no en otro sitio: la cifra tiene que aparecer en el
+              momento exacto en el que alguien esta decidiendo un numero. */}
+          <PrecioReferencia
+            mio
+            className="mt-3"
+            onUsar={(ref) => setForm((f) => ({ ...f, budgetMin: ref.min, budgetMax: ref.max }))}
+          />
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
@@ -179,11 +200,20 @@ function CampaignForm({ open, onClose, onCreated, facets }) {
           </button>
         </div>
       </form>
+      <AsistenteBrief
+        open={asistente}
+        onClose={() => setAsistente(false)}
+        campaign={{ targetCity: form.targetCity, budgetMin: form.budgetMin, budgetMax: form.budgetMax }}
+        onListo={(b) =>
+          setForm((f) => ({ ...f, title: b.titulo, brief: b.brief, deliverables: b.deliverables }))
+        }
+      />
     </Modal>
   )
 }
 
 export default function BrandCampaigns() {
+  const nav = useNavigate()
   const [params, setParams] = useSearchParams()
   const [filter, setFilter] = useState('ALL')
   const [open, setOpen] = useState(false)
@@ -269,6 +299,31 @@ export default function BrandCampaigns() {
                     <p className="text-[20px] font-black leading-none">{c.applicationsCount ?? 0}</p>
                     <p className="mt-1 text-[10.5px] font-bold uppercase tracking-wide text-ink/35">candidaturas</p>
                   </div>
+
+                  {/* El informe solo tiene sentido cuando hay algo que
+                      contar: antes de la primera colaboracion es una pagina
+                      vacia que decepciona. */}
+                  {c.dealsCount > 0 ? (
+                    <span
+                      role="link"
+                      tabIndex={0}
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        nav(`/empresa/campanas/${c.id}/informe`)
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          nav(`/empresa/campanas/${c.id}/informe`)
+                        }
+                      }}
+                      className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-black/[0.05] px-3 py-2 text-[12.5px] font-bold text-ink/70 transition hover:bg-black/10"
+                    >
+                      <BarChart3 size={14} /> Informe
+                    </span>
+                  ) : null}
                   <div className="text-center">
                     <p className="text-[20px] font-black leading-none">{c.dealsCount ?? 0}</p>
                     <p className="mt-1 text-[10.5px] font-bold uppercase tracking-wide text-ink/35">cerradas</p>

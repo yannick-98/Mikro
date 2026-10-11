@@ -71,6 +71,23 @@ export function publicCreator(creator, extra = {}) {
   }
 }
 
+/**
+ * La ficha del creador para el propio creador.
+ *
+ * Anade lo que solo debe ver el: sus datos fiscales. Deliberadamente separado
+ * de publicCreator, que es lo que ve cualquiera en su perfil y en su media
+ * kit; un NIF ahi no seria un descuido menor.
+ */
+export function privateCreator(creator) {
+  if (!creator) return null
+  return {
+    ...publicCreator(creator),
+    taxId: creator.taxId,
+    billingAddress: creator.billingAddress,
+    irpfRate: creator.irpfRate,
+  }
+}
+
 export function publicBrand(brand) {
   if (!brand) return null
   return {
@@ -84,6 +101,8 @@ export function publicBrand(brand) {
     description: brand.description,
     teamSize: brand.teamSize,
     monthlyBudget: brand.monthlyBudget,
+    vatNumber: brand.vatNumber,
+    billingAddress: brand.billingAddress,
     verified: brand.verified,
   }
 }
@@ -96,6 +115,8 @@ export function publicUser(user) {
     name: user.name,
     role: user.role,
     avatarUrl: user.avatarUrl,
+    phone: user.phone,
+    whatsappOptIn: user.whatsappOptIn,
     brand: user.brand ? publicBrand(user.brand) : null,
     creator: user.creator
       ? { id: user.creator.id, handle: user.creator.handle, displayName: user.creator.displayName, avatarUrl: user.creator.avatarUrl }
