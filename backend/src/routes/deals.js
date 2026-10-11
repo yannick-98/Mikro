@@ -54,6 +54,20 @@ function serializeDeal(deal, viewerRole) {
       reviewedAt: x.reviewedAt,
     })),
     invoices: (deal.invoices || []).map(publicInvoice),
+    envio: {
+      estado: deal.shipmentStatus,
+      // La direccion solo la ve quien la necesita: el propio creador y la
+      // empresa que tiene que mandar el paquete. Nadie mas pasa por aqui,
+      // pero conviene que el serializador no la reparta por costumbre.
+      nombre: deal.shippingName,
+      direccion: deal.shippingAddress,
+      telefono: deal.shippingPhone,
+      transportista: deal.carrier,
+      seguimiento: deal.trackingCode,
+      nota: deal.shipmentNote,
+      enviadoEl: deal.shippedAt,
+      recibidoEl: deal.receivedAt,
+    },
     messagesCount: deal._count?.messages ?? 0,
     reviewed: (deal.reviews || []).some((r) => r.authorId === deal.viewerId),
     viewerRole,
@@ -182,6 +196,148 @@ const TRANSITIONS = {
   release: { from: ['APPROVED'], to: 'PAID', actor: 'BRAND' },
   cancel: { from: ['ACCEPTED', 'FUNDED', 'IN_PROGRESS'], to: 'CANCELLED', actor: 'ANY' },
 }
+
+/**
+ * Emite (o reintenta) las facturas de la colaboracion.
+ *
+ * Existe porque el caso mas comun es que al aprobar faltara el NIF del
+ * creador. Antes eso se quedaba asi para siempre; ahora se rellena el perfil y
+ * se pulsa aqui.
+ */
+router.post(
+  '/:id/invoices',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const { deal } = await loadDealFor(req.user, req.params.id)
+    if (!['APPROVED', 'PAID'].includes(deal.status)) {
+      throw badRequest('Las facturas se emiten cuando la empresa ha aprobado el contenido')
+    }
+
+    await emitirFacturas(deal.id)
+    const invoices = await prisma.invoice.findMany({ where: { dealId: deal.id } })
+    res.json({ invoices: invoices.map(publicInvoice) })
+  }),
+)
+
+/**
+ * La direccion de envio la pone el creador.
+ *
+ * Vive en la colaboracion y no en su perfil a proposito: es su casa. Solo
+ * tiene que verla la empresa con la que ya ha cerrado un trato que exige
+ * mandarle algo, y solo mientras dure.
+ */
+router.put(
+  '/:id/shipping',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const { deal, isCreator } = await loadDealFor(req.user, req.params.id)
+    if (!isCreator) throw forbidden('La direccion la pone el creador')
+
+    const data = parseBody(
+      z.object({
+        shippingName: z.string().trim().min(2).max(120),
+        shippingAddress: z.string().trim().min(10).max(300),
+        shippingPhone: z.string().trim().max(30).optional(),
+      }),
+      req.body,
+    )
+
+    const updated = await prisma.deal.update({
+      where: { id: deal.id },
+      data: {
+        ...data,
+        // Dar la direccion es lo que pone el envio en marcha. Si ya iba mas
+        // adelante (corregir una direccion despues de enviar), no se retrocede.
+        shipmentStatus: deal.shipmentStatus === 'NONE' ? 'PENDING' : deal.shipmentStatus,
+      },
+      include: DEAL_INCLUDE,
+    })
+
+    await notify(deal.brand.userId, {
+      kind: 'DEAL',
+      title: 'Ya tienes la direccion de envio',
+      body: `${deal.creator.displayName} ha indicado donde mandarle el producto.`,
+      link: '/empresa/colaboraciones',
+    })
+
+    res.json({ deal: serializeDeal(updated, 'CREATOR') })
+  }),
+)
+
+/**
+ * Enviado y recibido, cada uno marcado por quien le toca.
+ *
+ * Las dos partes hacen falta porque la discusion clasica es "yo lo mande"
+ * contra "no me ha llegado". Que cada lado marque la suya deja constancia de
+ * quien dijo que y cuando, y evita que el creador aparezca como que no
+ * entrega cuando lo que pasa es que no ha recibido nada.
+ */
+router.post(
+  '/:id/shipment/:paso',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const { paso } = req.params
+    if (!['sent', 'received'].includes(paso)) throw notFound('Paso no soportado')
+
+    const { deal, isBrand, isCreator } = await loadDealFor(req.user, req.params.id)
+
+    if (paso === 'sent') {
+      if (!isBrand) throw forbidden('Solo la empresa marca el envio')
+      if (!deal.shippingAddress) {
+        throw badRequest('El creador todavia no ha indicado su direccion')
+      }
+      const data = parseBody(
+        z.object({
+          carrier: z.string().trim().max(60).optional(),
+          trackingCode: z.string().trim().max(80).optional(),
+          shipmentNote: z.string().trim().max(300).optional(),
+        }),
+        req.body,
+      )
+
+      const updated = await prisma.deal.update({
+        where: { id: deal.id },
+        data: { ...data, shipmentStatus: 'SENT', shippedAt: new Date() },
+        include: DEAL_INCLUDE,
+      })
+      await notify(deal.creator.userId, {
+        kind: 'DEAL',
+        title: 'Tu producto va en camino',
+        body: data.trackingCode
+          ? `${deal.brand.companyName} lo ha enviado. Seguimiento: ${data.trackingCode}`
+          : `${deal.brand.companyName} ha enviado el producto.`,
+        link: '/creador/colaboraciones',
+      })
+      return res.json({ deal: serializeDeal(updated, 'BRAND') })
+    }
+
+    if (!isCreator) throw forbidden('Solo el creador confirma que lo ha recibido')
+    if (deal.shipmentStatus !== 'SENT') throw badRequest('Este envio todavia no consta como enviado')
+
+    const updated = await prisma.deal.update({
+      where: { id: deal.id },
+      data: { shipmentStatus: 'RECEIVED', receivedAt: new Date() },
+      include: DEAL_INCLUDE,
+    })
+    await notify(deal.brand.userId, {
+      kind: 'DEAL',
+      title: 'Producto recibido',
+      body: `${deal.creator.displayName} confirma que le ha llegado. Ya puede ponerse.`,
+      link: '/empresa/colaboraciones',
+    })
+    res.json({ deal: serializeDeal(updated, 'CREATOR') })
+  }),
+)
+
+// ---------------------------------------------------------------------------
+// El comodin va EL ULTIMO, siempre.
+//
+// '/:id/:action' casa con cualquier cosa, asi que cualquier ruta concreta
+// registrada despues queda muerta: Express prueba en orden y esta responde
+// antes. Paso con '/:id/invoices', que durante un rato contestaba "accion no
+// soportada" sin que nadie lo notara, porque la pantalla recarga despues.
+// Si anades una ruta nueva, va encima de esta linea.
+// ---------------------------------------------------------------------------
 
 router.post(
   '/:id/:action',
@@ -315,26 +471,5 @@ router.post(
   }),
 )
 
-/**
- * Emite (o reintenta) las facturas de la colaboracion.
- *
- * Existe porque el caso mas comun es que al aprobar faltara el NIF del
- * creador. Antes eso se quedaba asi para siempre; ahora se rellena el perfil y
- * se pulsa aqui.
- */
-router.post(
-  '/:id/invoices',
-  requireAuth,
-  asyncHandler(async (req, res) => {
-    const { deal } = await loadDealFor(req.user, req.params.id)
-    if (!['APPROVED', 'PAID'].includes(deal.status)) {
-      throw badRequest('Las facturas se emiten cuando la empresa ha aprobado el contenido')
-    }
-
-    await emitirFacturas(deal.id)
-    const invoices = await prisma.invoice.findMany({ where: { dealId: deal.id } })
-    res.json({ invoices: invoices.map(publicInvoice) })
-  }),
-)
 
 export default router

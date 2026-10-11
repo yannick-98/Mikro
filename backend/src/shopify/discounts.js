@@ -18,6 +18,23 @@ const CREATE = `
   }
 `
 
+/**
+ * Envio gratis.
+ *
+ * Mutacion distinta de la del descuento basico, no un parametro de aquella:
+ * un envio gratis no toca el precio del producto, toca el del envio, y
+ * Shopify lo modela aparte. Los campos estan comprobados contra el esquema
+ * de la version que tenemos fijada.
+ */
+const CREATE_FREE_SHIPPING = `
+  mutation crearEnvioGratis($freeShippingCodeDiscount: DiscountCodeFreeShippingInput!) {
+    discountCodeFreeShippingCreate(freeShippingCodeDiscount: $freeShippingCodeDiscount) {
+      codeDiscountNode { id }
+      userErrors { field message }
+    }
+  }
+`
+
 const DEACTIVATE = `
   mutation desactivarCodigo($id: ID!) {
     discountCodeDeactivate(id: $id) {
@@ -70,8 +87,42 @@ export function buildCode(handle, prefix = 'MIKRO') {
   return `${prefix}-${base || 'CREADOR'}-${sufijo}`
 }
 
-/** Crea el descuento en Shopify y devuelve su identificador. */
-export async function createDiscount(shopDomain, { code, title, percentage, startsAt, endsAt, oncePerCustomer = false }) {
+/**
+ * Crea el codigo en Shopify y devuelve su identificador.
+ *
+ * discountType decide que clase de descuento es. El porcentaje se ignora en
+ * un envio gratis: ahi no hay porcentaje que aplicar, y arrastrarlo solo
+ * serviria para que alguien lo pintara como "0%" mas adelante.
+ */
+export async function createDiscount(shopDomain, opciones) {
+  if (opciones.discountType === 'FREE_SHIPPING') return createFreeShipping(shopDomain, opciones)
+  return createPercentage(shopDomain, opciones)
+}
+
+/** Envio gratis para cualquier destino de la tienda. */
+async function createFreeShipping(shopDomain, { code, title, startsAt, endsAt, oncePerCustomer = false }) {
+  const data = await adminGraphql(shopDomain, CREATE_FREE_SHIPPING, {
+    freeShippingCodeDiscount: {
+      title: title || `Mikro · ${code}`,
+      code,
+      startsAt: (startsAt || new Date()).toISOString(),
+      ...(endsAt ? { endsAt: new Date(endsAt).toISOString() } : {}),
+      context: { all: 'ALL' },
+      // A todos los destinos a los que ya envia la tienda. Limitarlo por pais
+      // seria una decision de la tienda, no nuestra.
+      destination: { all: true },
+      appliesOncePerCustomer: oncePerCustomer,
+    },
+  })
+
+  const result = throwOnUserErrors(
+    data.discountCodeFreeShippingCreate,
+    'No se pudo crear el codigo de envio gratis',
+  )
+  return result.codeDiscountNode.id
+}
+
+async function createPercentage(shopDomain, { code, title, percentage, startsAt, endsAt, oncePerCustomer = false }) {
   const data = await adminGraphql(shopDomain, CREATE, {
     basicCodeDiscount: {
       title: title || `Mikro · ${code}`,

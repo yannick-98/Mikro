@@ -261,9 +261,9 @@ model RankSnapshot {
 // ---------------------------------------------------------------------------
 
 model Campaign {
-  id           String    @id @default(cuid())
+  id           String @id @default(cuid())
   brandId      String
-  brand        Brand     @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  brand        Brand  @relation(fields: [brandId], references: [id], onDelete: Cascade)
   title        String
   brief        String
   category     String
@@ -284,7 +284,8 @@ model Campaign {
   // Shopify. Por eso exigir tienda conectada no es un requisito tecnico que
   // nos venga bien, es la unica forma de que la cifra exista.
   payModel      String @default("FIXED")
-  commissionPct Int    @default(0) // % de la venta neta para el creador
+  commissionPct Int    @default(0)
+  // % de la venta neta para el creador
 
   // Descuento que llevara el codigo del creador. Lo decide la campana porque
   // es parte de la oferta comercial, no una preferencia de la tienda: la
@@ -295,7 +296,24 @@ model Campaign {
   // venta, asi que tambien reduce la base sobre la que se paga la comision.
   // Un 30% de descuento con un 20% de comision es mucho mas caro de lo que
   // parece sumando los dos numeros.
-  discountPct Int @default(0)
+  // Que hace el codigo del creador. Un envio gratis convierte mejor que un
+  // 5% en carritos pequenos y a la tienda le cuesta menos que un porcentaje
+  // sobre el producto, asi que no es una variante menor: es otra palanca.
+  discountType String @default("PERCENTAGE") // PERCENTAGE | FREE_SHIPPING
+  discountPct  Int    @default(0)
+
+  // Ficha del producto. Solo tiene sentido en campanas de producto, y
+  // resuelve algo muy concreto: hoy el creador tiene que adivinar que va a
+  // promocionar leyendo el brief. Con la ficha sabe que es, cuanto cuesta y
+  // donde esta antes de postularse.
+  productName  String?
+  productUrl   String? // la pagina del producto en la tienda
+  productImage String?
+  productSku   String?
+  // Si hay algo fisico que mandarle al creador. Separado de productValue
+  // porque se puede ceder producto sin enviarlo (una cena, un servicio) y se
+  // puede enviar algo que no se cede (una muestra que se devuelve).
+  shipsProduct Boolean @default(false)
 
   budgetMin    Int
   budgetMax    Int
@@ -345,11 +363,31 @@ model Deal {
   // cambiado a la baja el trato que ya habia cerrado.
   payModel      String @default("FIXED")
   commissionPct Int    @default(0)
-  status      String   @default("ACCEPTED") // ACCEPTED | FUNDED | IN_PROGRESS | SUBMITTED | APPROVED | PAID | CANCELLED
-  contentUrl  String?
-  notes       String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  status        String @default("ACCEPTED") // ACCEPTED | FUNDED | IN_PROGRESS | SUBMITTED | APPROVED | PAID | CANCELLED
+
+  // Envio del producto al creador.
+  //
+  // Tiene dos partes y las dos hacen falta, porque la discusion clasica es
+  // "yo lo mande" contra "no me ha llegado". Que cada lado marque la suya
+  // deja constancia de quien dijo que y cuando, y evita que el creador
+  // aparezca como que no entrega cuando lo que pasa es que no ha recibido
+  // nada.
+  shipmentStatus  String    @default("NONE") // NONE | PENDING | SENT | RECEIVED
+  // La direccion la pone el creador cuando hace falta, y vive en la
+  // colaboracion y no en su perfil a proposito: es su casa, y solo tiene que
+  // verla la empresa con la que ya ha cerrado un trato que exige un envio.
+  shippingName    String?
+  shippingAddress String?
+  shippingPhone   String?
+  carrier         String?
+  trackingCode    String?
+  shipmentNote    String?
+  shippedAt       DateTime?
+  receivedAt      DateTime?
+  contentUrl      String?
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   messages     Message[]
   reviews      Review[]
@@ -593,16 +631,19 @@ model ShopifyAttribution {
   dealId     String?
   deal       Deal?     @relation(fields: [dealId], references: [id], onDelete: SetNull)
 
-  code        String // MIKRO-MARTA-7F3KQ
-  discountGid String? // el descuento creado en Shopify
-  percentage  Int       @default(10)
+  code         String // MIKRO-MARTA-7F3KQ
+  discountGid  String? // el descuento creado en Shopify
+  // Un codigo de envio gratis no tiene porcentaje, y ensenar "0%" en el
+  // panel seria decir que no descuenta nada cuando si descuenta.
+  discountType String    @default("PERCENTAGE") // PERCENTAGE | FREE_SHIPPING
+  percentage   Int       @default(10)
   // Destino del enlace que se comparte, guardado como ruta de la tienda
   // ("/products/x"). Ruta y no URL entera: asi el enlace no puede acabar
   // llevando a otro dominio.
-  landingUrl  String?
-  status      String    @default("ACTIVE") // ACTIVE | PAUSED | ENDED
-  startsAt    DateTime  @default(now())
-  endsAt      DateTime?
+  landingUrl   String?
+  status       String    @default("ACTIVE") // ACTIVE | PAUSED | ENDED
+  startsAt     DateTime  @default(now())
+  endsAt       DateTime?
 
   // Agregados: evitan recorrer todos los pedidos para pintar un panel.
   // salesTotal es bruto; lo devuelto se guarda aparte para poder enseniar las

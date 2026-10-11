@@ -136,6 +136,11 @@ export const api = {
   mediaKit: (handle) => request(`/mediakit/${handle}`),
   issueInvoices: (dealId) => request(`/deals/${dealId}/invoices`, { method: 'POST' }),
 
+  // Envio del producto al creador
+  setShipping: (dealId, payload) => request(`/deals/${dealId}/shipping`, { method: 'PUT', body: payload }),
+  markShipped: (dealId, payload) => request(`/deals/${dealId}/shipment/sent`, { method: 'POST', body: payload }),
+  markReceived: (dealId) => request(`/deals/${dealId}/shipment/received`, { method: 'POST' }),
+
   // Backoffice
   adminOverview: () => request('/admin/overview'),
   verifyCreator: (id, verified) => request(`/admin/creators/${id}/verify`, { method: 'POST', body: { verified } }),

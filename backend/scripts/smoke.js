@@ -164,6 +164,12 @@ async function main() {
       budgetMax: 400,
       targetCity: 'Madrid',
       platforms: 'instagram,tiktok',
+      kind: 'PRODUCT',
+      productName: 'Ramo de temporada',
+      productUrl: 'https://floristeria.test/products/ramo',
+      productValue: 35,
+      shipsProduct: true,
+      discountPct: 15,
     },
   })
   check('campana creada', camp.status === 201 && !!camp.json.campaign?.id)
@@ -200,6 +206,60 @@ async function main() {
   const intruder = await call(`/deals/${dealId}`, { token: (await call('/auth/login', { method: 'POST', body: { email: 'hola@laespiga.es', password: 'mikro1234' } })).json.token })
   check('acceso ajeno denegado', intruder.status === 403)
 
+  console.log('\n--- Envio del producto ---')
+
+  // Las dos partes del envio, cada una marcada por quien le toca. Lo que se
+  // comprueba aqui no es que funcione el camino feliz, sino que ninguno de
+  // los dos pueda marcar lo del otro: "yo lo mande" contra "no me ha
+  // llegado" es la discusion que esto existe para evitar.
+  check(
+    'arranca pendiente porque la campana envia producto',
+    (await call(`/deals/${dealId}`, { token: brandToken })).json.deal?.envio?.estado === 'PENDING',
+  )
+  check(
+    'no se puede enviar sin direccion',
+    (await call(`/deals/${dealId}/shipment/sent`, { method: 'POST', token: brandToken })).status === 400,
+  )
+  check(
+    'la empresa no pone la direccion del creador',
+    (await call(`/deals/${dealId}/shipping`, {
+      method: 'PUT',
+      token: brandToken,
+      body: { shippingName: 'Quien sea', shippingAddress: 'Calle Falsa 123, 28001 Madrid' },
+    })).status === 403,
+  )
+
+  const direccion = await call(`/deals/${dealId}/shipping`, {
+    method: 'PUT',
+    token: creatorToken,
+    body: {
+      shippingName: 'Creador Test',
+      shippingAddress: 'Calle del Pan 7, 3B, 28012 Madrid',
+      shippingPhone: '600123456',
+    },
+  })
+  check('el creador pone su direccion', direccion.status === 200)
+  check(
+    'recibido antes de enviar se rechaza',
+    (await call(`/deals/${dealId}/shipment/received`, { method: 'POST', token: creatorToken })).status === 400,
+  )
+
+  const enviado = await call(`/deals/${dealId}/shipment/sent`, {
+    method: 'POST',
+    token: brandToken,
+    body: { carrier: 'Correos Express', trackingCode: 'ABC123456789' },
+  })
+  check('la empresa marca enviado', enviado.json.deal?.envio?.estado === 'SENT')
+  check('con su seguimiento', enviado.json.deal?.envio?.seguimiento === 'ABC123456789')
+  check(
+    'la empresa no confirma la recepcion por el creador',
+    (await call(`/deals/${dealId}/shipment/received`, { method: 'POST', token: brandToken })).status === 403,
+  )
+
+  const recibido = await call(`/deals/${dealId}/shipment/received`, { method: 'POST', token: creatorToken })
+  check('el creador confirma que lo ha recibido', recibido.json.deal?.envio?.estado === 'RECEIVED')
+
+  console.log('')
   check('fondear', (await call(`/deals/${dealId}/fund`, { method: 'POST', token: brandToken })).status === 200)
   check('creador no puede fondear', (await call(`/deals/${dealId}/fund`, { method: 'POST', token: creatorToken })).status === 403)
   check('empezar', (await call(`/deals/${dealId}/start`, { method: 'POST', token: creatorToken })).status === 200)

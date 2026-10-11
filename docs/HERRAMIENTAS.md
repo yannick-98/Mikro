@@ -225,3 +225,59 @@ precio y la comisión sale de lo que queda, así que no se suman, se multiplican
 El formulario la hace en voz alta mientras escribes — «de cada 100 €, el
 cliente paga 70 y de ahí salen 7 para el creador; te quedan 63» — y rechaza
 las combinaciones que no dejan margen.
+
+---
+
+## 9. La ficha del producto y su envío
+
+### Qué se promociona
+
+Las campañas de producto llevan ficha: nombre, referencia, enlace en la
+tienda, imagen y valor. Antes el creador tenía que deducir el producto
+leyendo el brief, y a veces lo deducía mal: se postulaba a algo que no era, o
+describía en el vídeo un producto equivocado.
+
+El enlace no es decorativo. Es el destino natural del enlace que después
+comparte el creador, así que ponerlo aquí ahorra escribirlo otra vez al crear
+el código.
+
+### El envío
+
+`shipsProduct` es una casilla aparte del valor cedido, porque son cosas
+distintas: se puede ceder sin enviar (una cena, una clase) y se puede enviar
+sin ceder (una muestra que vuelve).
+
+Cuando la campaña envía producto, la colaboración arranca con el envío
+**pendiente** desde el minuto uno, en vez de aparecer cuando alguien se
+acuerda. A partir de ahí, cada lado marca lo suyo:
+
+```
+PENDING ──(el creador da su dirección)──> PENDING
+        ──(la empresa marca enviado)────> SENT
+        ──(el creador confirma)─────────> RECEIVED
+```
+
+**Ninguno de los dos puede marcar lo del otro, y eso es el punto.** La
+discusión clásica es «yo lo mandé» contra «no me ha llegado»; que cada uno
+marque su parte deja constancia de quién dijo qué y cuándo, y evita que el
+creador aparezca como que no entrega cuando lo que pasa es que no ha recibido
+nada. La prueba de humo comprueba los cuatro intentos cruzados, no solo el
+camino feliz.
+
+**La dirección vive en la colaboración, no en el perfil del creador.** Es su
+casa: solo tiene que verla la empresa con la que ya ha cerrado un trato que
+exige mandarle algo.
+
+### El cupón también puede ser envío gratis
+
+`discountType` es `PERCENTAGE` o `FREE_SHIPPING`. No es una variante menor del
+descuento: en Shopify es **otra mutación** (`discountCodeFreeShippingCreate`,
+no `discountCodeBasicCreate`), porque un envío gratis no toca el precio del
+producto sino el del envío.
+
+Como palanca comercial tampoco es lo mismo: convierte mejor que un 5 % en
+carritos pequeños y a la tienda le cuesta menos que rebajar el producto.
+
+En envío gratis el porcentaje se guarda a cero a propósito. Arrastrar un
+número que no se aplica acabaría pintándose como «0 %» en algún panel, que es
+justo lo contrario de lo que hace el código.

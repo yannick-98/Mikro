@@ -136,6 +136,9 @@ router.post(
           // cerrado con esta persona no.
           payModel: application.campaign.payModel,
           commissionPct: application.campaign.commissionPct,
+          // Si la campana manda algo fisico, el envio queda pendiente desde
+          // el minuto uno en vez de aparecer cuando alguien se acuerda.
+          shipmentStatus: application.campaign.shipsProduct ? 'PENDING' : 'NONE',
           status: 'ACCEPTED',
         },
       }),
@@ -203,6 +206,9 @@ router.post(
           // cerrado con esta persona no.
           payModel: application.campaign.payModel,
           commissionPct: application.campaign.commissionPct,
+          // Si la campana manda algo fisico, el envio queda pendiente desde
+          // el minuto uno en vez de aparecer cuando alguien se acuerda.
+          shipmentStatus: application.campaign.shipsProduct ? 'PENDING' : 'NONE',
           status: 'ACCEPTED',
         },
       }),

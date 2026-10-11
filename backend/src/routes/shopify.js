@@ -79,6 +79,7 @@ const dominiosPropios = (shop) => [shop.publicHost, shop.domain]
 const publicAttribution = (a, shop) => ({
   id: a.id,
   code: a.code,
+  discountType: a.discountType,
   percentage: a.percentage,
   status: a.status,
   ordersCount: a.ordersCount,
@@ -354,6 +355,7 @@ router.post(
         campaignId: z.string().min(1),
         creatorId: z.string().min(1).optional(),
         percentage: z.number().int().min(1).max(60).optional(),
+        discountType: z.enum(['PERCENTAGE', 'FREE_SHIPPING']).optional(),
         code: z.string().trim().max(40).optional(),
         landingUrl: z.string().trim().max(400).optional(),
         endsAt: z.string().datetime().optional(),
@@ -380,7 +382,13 @@ router.post(
     // el valor por defecto de la tienda. La campana va antes que el ajuste
     // general porque es una decision comercial concreta y el ajuste solo es
     // una preferencia.
-    const percentage = data.percentage ?? (campaign.discountPct || req.shop.defaultPercentage)
+    // Que clase de codigo: lo que pida la tienda ahora o lo que decidio la
+    // campana. El porcentaje solo se usa si es un descuento porcentual.
+    const discountType = data.discountType || campaign.discountType || 'PERCENTAGE'
+    const percentage =
+      discountType === 'FREE_SHIPPING'
+        ? 0
+        : (data.percentage ?? (campaign.discountPct || req.shop.defaultPercentage))
     if (data.code && code.length < 3) throw badRequest('El codigo necesita al menos 3 letras o numeros')
 
     // El destino se valida antes de crear nada en Shopify: un enlace mal
@@ -401,6 +409,7 @@ router.post(
 
     const discountGid = await createDiscount(req.shop.domain, {
       code,
+      discountType,
       title: `Mikro · ${campaign.title}${creator ? ` · ${creator.displayName}` : ''}`,
       percentage,
       endsAt: data.endsAt,
@@ -414,6 +423,7 @@ router.post(
         creatorId: creator?.id || null,
         code,
         discountGid,
+        discountType,
         percentage,
         landingUrl: landingPath,
         endsAt: data.endsAt ? new Date(data.endsAt) : null,

@@ -141,6 +141,19 @@ export function publicCampaign(campaign, extra = {}) {
     // sin saber si son seguros o dependen de lo que venda.
     kind: campaign.kind,
     oferta: ofertaCampana(campaign),
+    // La ficha del producto, para que el creador sepa que va a promocionar
+    // sin tener que deducirlo del brief.
+    producto:
+      campaign.kind === 'PRODUCT' && (campaign.productName || campaign.productUrl)
+        ? {
+            nombre: campaign.productName,
+            url: campaign.productUrl,
+            imagen: campaign.productImage,
+            sku: campaign.productSku,
+            valor: campaign.productValue,
+            seEnvia: campaign.shipsProduct,
+          }
+        : null,
     targetCity: campaign.targetCity,
     minFollowers: campaign.minFollowers,
     maxFollowers: campaign.maxFollowers,

@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import clsx from 'clsx'
-import { ArrowRight, Check, ExternalLink, Handshake, Link2, RotateCcw, Send, ShieldCheck, Star, Wallet } from 'lucide-react'
+import { ArrowRight, Check, ExternalLink, Handshake, Link2, RotateCcw, Send, ShieldCheck, Star, Truck, Wallet } from 'lucide-react'
 import { api } from '../api/client'
 import { Avatar, EmptyState, Modal, Spinner, Toast, useAsync, useToast } from './ui'
 import { StatusPill } from './Dashboard'
 import EntregasYFacturas from './EntregasYFacturas'
+import EnvioProducto from './EnvioProducto'
 import { DEAL_STATUS, formatEuro, formatRelative } from '../lib/format'
 
 /** Acciones disponibles en cada estado, por rol. */
@@ -435,6 +436,25 @@ export default function DealsView({ role, meId }) {
                         <span className="text-[15px] font-extrabold tracking-tight">{d.brand.companyName}</span>
                       )}
                       <StatusPill status={d.status} map={DEAL_STATUS} />
+                      {/* El envio se ve sin desplegar: es lo que bloquea al
+                          creador, y enterrarlo haria que nadie lo mirase. */}
+                      {d.envio && d.envio.estado !== 'NONE' && d.envio.estado !== 'RECEIVED' ? (
+                        <span
+                          className={clsx(
+                            'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11.5px] font-bold',
+                            d.envio.estado === 'SENT'
+                              ? 'bg-blue-50 text-blue-700'
+                              : 'bg-amber-50 text-amber-800',
+                          )}
+                        >
+                          <Truck size={11} />
+                          {d.envio.estado === 'SENT'
+                            ? 'producto en camino'
+                            : d.envio.direccion
+                              ? 'falta enviar el producto'
+                              : 'falta la dirección'}
+                        </span>
+                      ) : null}
                     </div>
                     <p className="mt-0.5 truncate text-[13px] font-semibold text-ink/50">{d.campaign.title}</p>
 
@@ -548,6 +568,7 @@ export default function DealsView({ role, meId }) {
 
                 {selected === d.id && detail ? (
                   <div className="mt-4 space-y-5 rounded-2xl border border-black/[0.06] bg-black/[0.015] p-4">
+                    <EnvioProducto deal={d} role={role} onCambio={reload} show={show} />
                     <EntregasYFacturas deal={d} role={role} onCambio={reload} show={show} />
                     <Chat
                       deal={d}

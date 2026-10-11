@@ -104,6 +104,7 @@ export function ofertaCampana(campaign) {
     commissionPct: llevaVariable(campaign.payModel) ? campaign.commissionPct : 0,
     // El descuento que llevara el codigo. Para el creador no es un detalle
     // administrativo: es su argumento de venta, lo que puede decir en camara.
+    discountType: campaign.discountType || 'PERCENTAGE',
     discountPct: campaign.discountPct || 0,
     // Que parte es segura. Es el dato con el que un creador decide.
     garantizado: fijo ? fijo.min : 0,

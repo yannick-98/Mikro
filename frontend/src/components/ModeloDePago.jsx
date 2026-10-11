@@ -1,6 +1,6 @@
 import clsx from 'clsx'
 import { Link } from 'react-router-dom'
-import { AlertTriangle, Package, ShoppingBag, Wrench } from 'lucide-react'
+import { AlertTriangle, Package, Percent, ShoppingBag, Truck, Wrench } from 'lucide-react'
 
 /**
  * Que se promociona y como se paga.
@@ -69,7 +69,13 @@ function Opcion({ activo, disponible = true, titulo, detalle, icono: Icono, onCl
 }
 
 export default function ModeloDePago({ valor, onChange, tieneTienda }) {
-  const { kind = 'PRODUCT', payModel = 'FIXED', commissionPct = 10, discountPct = 0 } = valor
+  const {
+    kind = 'PRODUCT',
+    payModel = 'FIXED',
+    commissionPct = 10,
+    discountPct = 0,
+    discountType = 'PERCENTAGE',
+  } = valor
   const set = (cambios) => onChange({ ...valor, ...cambios })
 
   const puedeVariable = kind === 'PRODUCT' && tieneTienda
@@ -168,6 +174,37 @@ export default function ModeloDePago({ valor, onChange, tieneTienda }) {
           y un 25% en una liquidación. */}
       {kind === 'PRODUCT' ? (
         <div>
+          <span className="label">¿Qué dará el código del creador?</span>
+          <div className="mt-1 grid gap-2 sm:grid-cols-2">
+            <Opcion
+              activo={discountType === 'PERCENTAGE'}
+              disponible={tieneTienda}
+              titulo="Un descuento"
+              detalle="Un % sobre el precio"
+              icono={Percent}
+              onClick={() => set({ discountType: 'PERCENTAGE' })}
+            />
+            <Opcion
+              activo={discountType === 'FREE_SHIPPING'}
+              disponible={tieneTienda}
+              titulo="Envío gratis"
+              detalle="Sin tocar el precio del producto"
+              icono={Truck}
+              onClick={() => set({ discountType: 'FREE_SHIPPING', discountPct: 0 })}
+            />
+          </div>
+
+          {discountType === 'FREE_SHIPPING' ? (
+            <p className="mt-2 text-[12.5px] leading-relaxed text-ink/50">
+              Suele convertir mejor que un 5 % en carritos pequeños y a ti te cuesta menos que
+              rebajar el producto. Se aplica a todos los destinos a los que ya envías.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
+      {kind === 'PRODUCT' && discountType === 'PERCENTAGE' ? (
+        <div>
           <label className="label">Descuento del código</label>
           <div className="flex flex-wrap items-center gap-3">
             <div className="relative">
@@ -244,7 +281,11 @@ export function OfertaResumen({ oferta, className }) {
       {payModel === 'VARIABLE' ? (
         <span className="text-[11.5px] font-semibold text-amber-700">sin fijo</span>
       ) : null}
-      {oferta.discountPct ? (
+      {oferta.discountType === 'FREE_SHIPPING' ? (
+        <span className="inline-flex items-center gap-1 rounded-md bg-black/[0.05] px-1.5 py-0.5 text-[11.5px] font-bold text-ink/60">
+          <Truck size={11} /> envío gratis
+        </span>
+      ) : oferta.discountPct ? (
         <span className="rounded-md bg-black/[0.05] px-1.5 py-0.5 text-[11.5px] font-bold text-ink/60">
           código −{oferta.discountPct}%
         </span>

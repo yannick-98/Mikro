@@ -8,6 +8,7 @@ import { EmptyState, Modal, Spinner, Toast, useAsync, useToast } from '../../com
 import AsistenteBrief from '../../components/AsistenteBrief'
 import PrecioReferencia from '../../components/PrecioReferencia'
 import ModeloDePago, { OfertaResumen } from '../../components/ModeloDePago'
+import FichaProducto from '../../components/FichaProducto'
 import { CAMPAIGN_STATUS, formatDate, formatEuro } from '../../lib/format'
 import { BRAND_NAV } from './nav'
 
@@ -26,6 +27,12 @@ const EMPTY = {
   payModel: 'FIXED',
   commissionPct: 10,
   discountPct: 0,
+  discountType: 'PERCENTAGE',
+  productName: '',
+  productUrl: '',
+  productImage: '',
+  productSku: '',
+  shipsProduct: false,
   category: 'Gastronomia',
   deliverables: '1 reel, 3 stories',
   budgetMin: 150,
@@ -67,6 +74,17 @@ function CampaignForm({ open, onClose, onCreated, facets, tieneTienda }) {
         budgetMax: form.payModel === 'VARIABLE' ? 0 : Number(form.budgetMax),
         commissionPct: form.payModel === 'FIXED' ? 0 : Number(form.commissionPct),
         discountPct: form.kind === 'SERVICE' ? 0 : Number(form.discountPct),
+        discountType: form.discountType,
+        // La ficha del producto no viaja en una campana de servicio.
+        ...(form.kind === 'PRODUCT'
+          ? {
+              productName: form.productName || undefined,
+              productUrl: form.productUrl || undefined,
+              productImage: form.productImage || undefined,
+              productSku: form.productSku || undefined,
+              shipsProduct: form.shipsProduct,
+            }
+          : { shipsProduct: false }),
         minFollowers: Number(form.minFollowers),
         maxFollowers: Number(form.maxFollowers),
         productValue: Number(form.productValue),
@@ -149,11 +167,28 @@ function CampaignForm({ open, onClose, onCreated, facets, tieneTienda }) {
               payModel: form.payModel,
               commissionPct: form.commissionPct,
               discountPct: form.discountPct,
+              discountType: form.discountType,
             }}
             onChange={(v) => setForm((f) => ({ ...f, ...v }))}
             tieneTienda={tieneTienda}
           />
         </div>
+
+        {form.kind === 'PRODUCT' ? (
+          <div className="rounded-2xl border border-black/[0.08] bg-black/[0.015] p-4">
+            <FichaProducto
+              valor={{
+                productName: form.productName,
+                productUrl: form.productUrl,
+                productImage: form.productImage,
+                productSku: form.productSku,
+                productValue: form.productValue,
+                shipsProduct: form.shipsProduct,
+              }}
+              onChange={(v) => setForm((f) => ({ ...f, ...v }))}
+            />
+          </div>
+        ) : null}
 
         {/* Sin importe fijo no hay presupuesto que pedir. */}
         <div className={form.payModel === 'VARIABLE' ? 'hidden' : undefined}>
@@ -207,13 +242,18 @@ function CampaignForm({ open, onClose, onCreated, facets, tieneTienda }) {
           </div>
         </div>
 
-        <div>
-          <label className="label">Valor del producto cedido (EUR, opcional)</label>
-          <input type="number" min={0} value={form.productValue} onChange={setNum('productValue')} className="field" />
-          <p className="mt-1.5 text-[12px] text-ink/45">
-            Si ademas del pago entregas producto, indicalo: sube el atractivo de la campana.
-          </p>
-        </div>
+        {/* En producto, este dato lo pide la ficha de arriba. Aqui solo
+            aparece para los servicios, donde tambien se puede ceder algo
+            (una cena, una clase) pero no hay ficha de producto. */}
+        {form.kind === 'SERVICE' ? (
+          <div>
+            <label className="label">Valor de lo que cedes (EUR, opcional)</label>
+            <input type="number" min={0} value={form.productValue} onChange={setNum('productValue')} className="field" />
+            <p className="mt-1.5 text-[12px] text-ink/45">
+              Si ademas del pago entregas algo, indicalo: sube el atractivo de la campana.
+            </p>
+          </div>
+        ) : null}
 
         {error ? <p className="rounded-xl bg-rose-50 px-3.5 py-2.5 text-[13px] font-semibold text-rose-700">{error}</p> : null}
 

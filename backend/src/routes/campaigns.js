@@ -29,6 +29,12 @@ const campaignSchema = z.object({
   payModel: z.enum(['FIXED', 'FIXED_VARIABLE', 'VARIABLE']).optional(),
   commissionPct: z.number().int().min(0).max(50).optional(),
   discountPct: z.number().int().min(0).max(70).optional(),
+  discountType: z.enum(['PERCENTAGE', 'FREE_SHIPPING']).optional(),
+  productName: z.string().trim().max(140).optional(),
+  productUrl: z.string().trim().max(400).optional(),
+  productImage: z.string().trim().max(500).optional(),
+  productSku: z.string().trim().max(60).optional(),
+  shipsProduct: z.boolean().optional(),
 })
 
 /**
@@ -42,12 +48,15 @@ const campaignSchema = z.object({
 async function comprobarOferta(brandId, data) {
   const payModel = data.payModel || 'FIXED'
   const kind = data.kind || 'PRODUCT'
-  const discountPct = data.discountPct || 0
+  const tipo = data.discountType || 'PERCENTAGE'
+  // En envio gratis no hay porcentaje. Guardar uno dejaria dos verdades en la
+  // misma fila y alguna pantalla acabaria pintando la equivocada.
+  const discountPct = tipo === 'FREE_SHIPPING' ? 0 : data.discountPct || 0
 
   // La tienda solo se consulta si hace falta: una campana de pago fijo sin
   // descuento no necesita saber nada de Shopify.
   const tienda =
-    payModel === 'FIXED' && !discountPct
+    payModel === 'FIXED' && !discountPct && tipo === 'PERCENTAGE'
       ? null
       : await prisma.shopifyShop.findFirst({
           where: { brandId, uninstalledAt: null },
@@ -65,7 +74,13 @@ async function comprobarOferta(brandId, data) {
   })
   if (error) throw badRequest(error)
 
-  return { kind, payModel, commissionPct: payModel === 'FIXED' ? 0 : data.commissionPct, discountPct }
+  return {
+    kind,
+    payModel,
+    commissionPct: payModel === 'FIXED' ? 0 : data.commissionPct,
+    discountPct,
+    discountType: data.discountType || 'PERCENTAGE',
+  }
 }
 
 /** Campanas abiertas: escaparate para creadores. */
@@ -250,13 +265,15 @@ router.patch(
       data.payModel !== undefined ||
       data.commissionPct !== undefined ||
       data.kind !== undefined ||
-      data.discountPct !== undefined
+      data.discountPct !== undefined ||
+      data.discountType !== undefined
     const oferta = tocaElPago
       ? await comprobarOferta(req.user.brand.id, {
           kind: data.kind ?? existing.kind,
           payModel: data.payModel ?? existing.payModel,
           commissionPct: data.commissionPct ?? existing.commissionPct,
           discountPct: data.discountPct ?? existing.discountPct,
+          discountType: data.discountType ?? existing.discountType,
           budgetMin: data.budgetMin ?? existing.budgetMin,
           budgetMax: data.budgetMax ?? existing.budgetMax,
         })

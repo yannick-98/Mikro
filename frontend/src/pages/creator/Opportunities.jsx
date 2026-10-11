@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import clsx from 'clsx'
-import { AlertTriangle, Briefcase, Check, Package, Send, Tag, TrendingUp } from 'lucide-react'
+import { AlertTriangle, Briefcase, Check, Package, Send, Tag, TrendingUp, Truck } from 'lucide-react'
 import { api } from '../../api/client'
 import { DashboardShell } from '../../components/Dashboard'
 import { Avatar, EmptyState, Modal, Spinner, Toast, useAsync, useToast } from '../../components/ui'
@@ -195,7 +195,50 @@ export default function Opportunities() {
                     {c.endDate ? <span>Hasta el {formatDate(c.endDate)}</span> : null}
                   </div>
 
-                  {c.oferta?.discountPct ? (
+                  {/* El producto, con su foto si la hay. Antes habia que
+                      deducirlo del brief y a veces se deducia mal. */}
+                  {c.producto ? (
+                    <div className="mt-3 flex items-center gap-3 rounded-xl border border-black/[0.07] p-2.5">
+                      {c.producto.imagen ? (
+                        <img
+                          src={c.producto.imagen}
+                          alt=""
+                          className="h-12 w-12 shrink-0 rounded-lg object-cover"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-black/[0.04]">
+                          <Package size={16} className="text-ink/30" />
+                        </span>
+                      )}
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[13.5px] font-bold">
+                          {c.producto.nombre || 'El producto de la campaña'}
+                        </span>
+                        <span className="block text-[12px] text-ink/50">
+                          {c.producto.valor > 0 ? `${formatEuro(c.producto.valor)} de valor` : null}
+                          {c.producto.valor > 0 && c.producto.seEnvia ? ' · ' : null}
+                          {c.producto.seEnvia ? 'te lo envían' : null}
+                        </span>
+                      </span>
+                      {c.producto.url ? (
+                        <a
+                          href={c.producto.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="shrink-0 text-[12px] font-bold text-brand-600 hover:underline"
+                        >
+                          Verlo
+                        </a>
+                      ) : null}
+                    </div>
+                  ) : null}
+
+                  {c.oferta?.discountType === 'FREE_SHIPPING' ? (
+                    <p className="mt-2.5 inline-flex items-center gap-1.5 rounded-lg bg-black/[0.05] px-2.5 py-1 text-[12px] font-bold text-ink/65">
+                      <Truck size={13} /> Tu código dará envío gratis a tus seguidores
+                    </p>
+                  ) : c.oferta?.discountPct ? (
                     <p className="mt-2.5 inline-flex items-center gap-1.5 rounded-lg bg-black/[0.05] px-2.5 py-1 text-[12px] font-bold text-ink/65">
                       <Tag size={13} /> Tu código dará un {c.oferta.discountPct}% a tus seguidores
                     </p>
