@@ -14,6 +14,8 @@ import dealRoutes from './routes/deals.js'
 import searchRoutes from './routes/search.js'
 import rankingRoutes from './routes/rankings.js'
 import demoRoutes from './routes/demos.js'
+import socialRoutes from './routes/social.js'
+import toolRoutes from './routes/tools.js'
 import shopifyRoutes from './routes/shopify.js'
 import shopifyWebhookRoutes from './routes/shopifyWebhooks.js'
 import miscRoutes from './routes/misc.js'
@@ -61,6 +63,10 @@ export function createApp() {
   app.use('/api/search', router(searchRoutes))
   app.use('/api/rankings', router(rankingRoutes))
   app.use('/api/demo-requests', router(demoRoutes))
+  app.use('/api/social', router(socialRoutes))
+  // Herramientas: precio de referencia, informe, brief y media kit. Montadas
+  // en la raiz porque cada una cuelga de donde le corresponde por recurso.
+  app.use('/api', router(toolRoutes))
   app.use('/api/shopify', router(shopifyRoutes))
   app.use('/api', router(miscRoutes))
 

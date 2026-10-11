@@ -32,7 +32,11 @@ export function computeScore(creator) {
   const reputacion = creator.ratingCount > 0 ? (creator.ratingAvg / 5) * 100 : 55
   const actividad = clamp((creator.completedDeals || 0) / 12, 0, 1) * 100
   const respuesta = clamp(1 - (creator.responseHours || 24) / 72, 0, 1) * 100
-  const confianza = (creator.verified ? 100 : 40) * 1
+  // Confianza: no es lo mismo un perfil con la identidad comprobada que uno
+  // cuyas cifras vienen de la propia plataforma. Lo segundo pesa mas, porque
+  // es lo que la marca esta comprando. Quien tiene las dos cosas, arriba.
+  const medidas = creator.metricsSource === 'CONNECTED'
+  const confianza = medidas && creator.verified ? 100 : medidas ? 85 : creator.verified ? 70 : 40
 
   const score =
     alcance * 0.2 +

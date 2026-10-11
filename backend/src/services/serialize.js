@@ -21,6 +21,12 @@ export function publicCreator(creator, extra = {}) {
     available: creator.available,
     totalFollowers: creator.totalFollowers,
     engagementRate: creator.engagementRate,
+    postsPerWeek: creator.postsPerWeek,
+    // De donde salen las tres cifras de arriba. Viaja siempre con ellas: una
+    // marca que decide con estos numeros tiene derecho a saber si los ha
+    // comprobado alguien o los escribio el interesado.
+    metricsSource: creator.metricsSource,
+    metricsVerifiedAt: creator.metricsVerifiedAt,
     score: creator.score,
     rankPosition: creator.rankPosition,
     rankDelta: creator.rankDelta,
@@ -46,6 +52,13 @@ export function publicCreator(creator, extra = {}) {
       followers: a.followers,
       engagement: a.engagement,
       avgViews: a.avgViews,
+      source: a.source,
+      postsPerWeek: a.postsPerWeek,
+      postsAnalyzed: a.postsAnalyzed,
+      avgLikes: a.avgLikes,
+      avgComments: a.avgComments,
+      lastPostAt: a.lastPostAt,
+      lastSyncAt: a.lastSyncAt,
     })),
     portfolio: (creator.portfolio || []).map((p) => ({
       id: p.id,
@@ -135,6 +148,7 @@ export function landingCreator(creator, position) {
     verified: creator.verified,
     totalFollowers: creator.totalFollowers,
     engagementRate: creator.engagementRate,
+    metricsSource: creator.metricsSource,
     city: creator.city,
     score: creator.score,
     rankDelta: creator.rankDelta,

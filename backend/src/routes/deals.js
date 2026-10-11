@@ -6,6 +6,7 @@ import { requireAuth } from '../middleware/auth.js'
 import { publicCampaign, publicCreator, publicBrand } from '../services/serialize.js'
 import { recomputeCreator } from '../services/creatorStats.js'
 import { notify } from '../services/notify.js'
+import { emitirFacturas, publicInvoice } from '../services/invoice.js'
 
 const router = Router()
 
@@ -15,6 +16,8 @@ const DEAL_INCLUDE = {
   creator: { include: { user: true, socialAccounts: true } },
   payments: true,
   reviews: true,
+  submissions: { orderBy: { version: 'desc' } },
+  invoices: true,
   _count: { select: { messages: true } },
 }
 
@@ -33,6 +36,17 @@ function serializeDeal(deal, viewerRole) {
     brand: publicBrand(deal.brand),
     creator: publicCreator(deal.creator),
     payments: deal.payments,
+    submissions: (deal.submissions || []).map((x) => ({
+      id: x.id,
+      version: x.version,
+      url: x.url,
+      note: x.note,
+      status: x.status,
+      feedback: x.feedback,
+      createdAt: x.createdAt,
+      reviewedAt: x.reviewedAt,
+    })),
+    invoices: (deal.invoices || []).map(publicInvoice),
     messagesCount: deal._count?.messages ?? 0,
     reviewed: (deal.reviews || []).some((r) => r.authorId === deal.viewerId),
     viewerRole,
@@ -154,6 +168,10 @@ const TRANSITIONS = {
   start: { from: ['FUNDED'], to: 'IN_PROGRESS', actor: 'CREATOR' },
   submit: { from: ['FUNDED', 'IN_PROGRESS'], to: 'SUBMITTED', actor: 'CREATOR' },
   approve: { from: ['SUBMITTED'], to: 'APPROVED', actor: 'BRAND' },
+  // Pedir cambios devuelve la colaboracion a en curso. Antes no existia: la
+  // empresa solo podia aprobar o no hacer nada, y "no hacer nada" con el
+  // dinero retenido es la peor forma posible de decir que algo no encaja.
+  changes: { from: ['SUBMITTED'], to: 'IN_PROGRESS', actor: 'BRAND' },
   release: { from: ['APPROVED'], to: 'PAID', actor: 'BRAND' },
   cancel: { from: ['ACCEPTED', 'FUNDED', 'IN_PROGRESS'], to: 'CANCELLED', actor: 'ANY' },
 }
@@ -180,8 +198,60 @@ router.post(
       data.contentUrl = req.body.contentUrl
       data.notes = req.body.notes || deal.notes
     }
+    if (action === 'changes' && !String(req.body?.feedback || '').trim()) {
+      throw badRequest('Di que hay que cambiar: devolver el trabajo sin explicar por que no ayuda a nadie')
+    }
 
     const updated = await prisma.deal.update({ where: { id: deal.id }, data })
+
+    // El historial de entregas. Cada envio es una version nueva, y la
+    // respuesta de la empresa se queda escrita al lado de la version concreta
+    // a la que se refiere: es la conversacion que decide si se suelta el
+    // dinero, y tenerla por escrito evita la mitad de las disputas.
+    if (action === 'submit') {
+      const ultima = await prisma.contentSubmission.findFirst({
+        where: { dealId: deal.id },
+        orderBy: { version: 'desc' },
+        select: { version: true },
+      })
+      await prisma.contentSubmission.create({
+        data: {
+          dealId: deal.id,
+          version: (ultima?.version || 0) + 1,
+          url: req.body.contentUrl,
+          note: req.body.notes || null,
+        },
+      })
+    }
+    if (action === 'approve' || action === 'changes') {
+      const pendiente = await prisma.contentSubmission.findFirst({
+        where: { dealId: deal.id, status: 'PENDING' },
+        orderBy: { version: 'desc' },
+      })
+      if (pendiente) {
+        await prisma.contentSubmission.update({
+          where: { id: pendiente.id },
+          data: {
+            status: action === 'approve' ? 'APPROVED' : 'CHANGES_REQUESTED',
+            feedback: String(req.body?.feedback || '').trim() || null,
+            reviewedAt: new Date(),
+          },
+        })
+      }
+    }
+
+    // Las facturas se emiten al aprobar y no al pagar: el trabajo esta hecho y
+    // aceptado, que es el hecho que las devenga. emitirFacturas no duplica si
+    // ya existen.
+    if (action === 'approve') {
+      try {
+        await emitirFacturas(deal.id)
+      } catch (e) {
+        // Una factura que no sale no puede bloquear la aprobacion de un
+        // trabajo: se anota y se puede reintentar desde la propia pantalla.
+        console.warn('[facturas] no se pudieron emitir:', e?.message)
+      }
+    }
 
     // Movimientos de dinero simulados (escrow)
     if (action === 'fund') {
@@ -221,6 +291,7 @@ router.post(
       start: ['Colaboracion en marcha', 'El creador ha empezado a trabajar.'],
       submit: ['Contenido entregado', 'Revisa el contenido y aprueba la colaboracion.'],
       approve: ['Contenido aprobado', 'La empresa ha aprobado tu trabajo.'],
+      changes: ['Te piden cambios', 'La empresa ha revisado el contenido y pide algun ajuste.'],
       release: ['Pago liberado', 'El importe se ha enviado al creador.'],
       cancel: ['Colaboracion cancelada', 'La colaboracion se ha cancelado.'],
     }
@@ -234,6 +305,28 @@ router.post(
     })
 
     res.json({ deal: { ...updated } })
+  }),
+)
+
+/**
+ * Emite (o reintenta) las facturas de la colaboracion.
+ *
+ * Existe porque el caso mas comun es que al aprobar faltara el NIF del
+ * creador. Antes eso se quedaba asi para siempre; ahora se rellena el perfil y
+ * se pulsa aqui.
+ */
+router.post(
+  '/:id/invoices',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const { deal } = await loadDealFor(req.user, req.params.id)
+    if (!['APPROVED', 'PAID'].includes(deal.status)) {
+      throw badRequest('Las facturas se emiten cuando la empresa ha aprobado el contenido')
+    }
+
+    await emitirFacturas(deal.id)
+    const invoices = await prisma.invoice.findMany({ where: { dealId: deal.id } })
+    res.json({ invoices: invoices.map(publicInvoice) })
   }),
 )
 

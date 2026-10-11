@@ -2,7 +2,7 @@
 // Marketplace que conecta pymes con micro-influencers.
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
   // rhel-openssl-3.0.x es el motor que necesitan las funciones de Netlify
   // (Amazon Linux 2023); "native" mantiene el desarrollo en local.
   binaryTargets = ["native", "rhel-openssl-3.0.x"]
@@ -20,14 +20,20 @@ datasource db {
 // ---------------------------------------------------------------------------
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  passwordHash String
-  role         String // BRAND | CREATOR | ADMIN
-  name         String
-  avatarUrl    String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id            String   @id @default(cuid())
+  email         String   @unique
+  passwordHash  String
+  role          String // BRAND | CREATOR | ADMIN
+  name          String
+  avatarUrl     String?
+  // Una pyme espanola no vive en el correo. El telefono solo se usa para
+  // avisar de lo que no puede esperar (una candidatura, una entrega, un pago)
+  // y solo si lo ha pedido: whatsappOptIn es el permiso, no una casilla
+  // marcada de serie.
+  phone         String?
+  whatsappOptIn Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   brand          Brand?
   creator        Creator?
@@ -38,21 +44,22 @@ model User {
 }
 
 model Brand {
-  id            String   @id @default(cuid())
-  userId        String   @unique
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  companyName   String
-  sector        String
-  city          String
-  province      String?
-  website       String?
-  logoUrl       String?
-  description   String?
-  teamSize      String? // 1-5 | 6-20 | 21-50 | 50+
-  monthlyBudget Int? // euros
-  vatNumber     String?
-  verified      Boolean  @default(false)
-  createdAt     DateTime @default(now())
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyName    String
+  sector         String
+  city           String
+  province       String?
+  website        String?
+  logoUrl        String?
+  description    String?
+  teamSize       String? // 1-5 | 6-20 | 21-50 | 50+
+  monthlyBudget  Int? // euros
+  vatNumber      String?
+  billingAddress String?
+  verified       Boolean  @default(false)
+  createdAt      DateTime @default(now())
 
   campaigns     Campaign[]
   savedCreators SavedCreator[]
@@ -61,10 +68,10 @@ model Brand {
 }
 
 model Creator {
-  id            String   @id @default(cuid())
-  userId        String   @unique
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  handle        String   @unique
+  id            String  @id @default(cuid())
+  userId        String  @unique
+  user          User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  handle        String  @unique
   displayName   String
   headline      String?
   bio           String?
@@ -74,27 +81,44 @@ model Creator {
   subcategories String? // CSV
   city          String
   province      String?
-  country       String   @default("Espana")
-  languages     String   @default("Espanol") // CSV
-  verified      Boolean  @default(false)
-  featured      Boolean  @default(false)
-  available     Boolean  @default(true)
+  country       String  @default("Espana")
+  languages     String  @default("Espanol") // CSV
+  verified      Boolean @default(false)
+  featured      Boolean @default(false)
+  available     Boolean @default(true)
 
   // Metricas agregadas: las recalcula services/score.js
-  totalFollowers Int   @default(0)
-  engagementRate Float @default(0)
-  score          Float @default(0)
-  rankPosition   Int   @default(0)
-  rankDelta      Int   @default(0) // movimiento respecto a la semana pasada
-  responseHours  Int   @default(24)
-  completedDeals Int   @default(0)
-  ratingAvg      Float @default(0)
-  ratingCount    Int   @default(0)
+  totalFollowers    Int       @default(0)
+  engagementRate    Float     @default(0)
+  // Publicaciones por semana. Una cuenta que publica una vez al mes tiene
+  // menos valor para una campana que otra igual que publica tres veces por
+  // semana, por muchos seguidores que tenga.
+  postsPerWeek      Float     @default(0)
+  // De donde salen las tres cifras de arriba. DECLARED mientras las ponga el
+  // creador; CONNECTED en cuanto haya al menos una cuenta conectada, y
+  // entonces metricsVerifiedAt dice de cuando son.
+  metricsSource     String    @default("DECLARED")
+  metricsVerifiedAt DateTime?
+  score             Float     @default(0)
+  rankPosition      Int       @default(0)
+  rankDelta         Int       @default(0) // movimiento respecto a la semana pasada
+  responseHours     Int       @default(24)
+  completedDeals    Int       @default(0)
+  ratingAvg         Float     @default(0)
+  ratingCount       Int       @default(0)
 
   // Audiencia
   audienceCountry   String @default("Espana")
   audienceFemalePct Int    @default(50)
   audienceAgeRange  String @default("25-34")
+
+  // Datos fiscales. Un creador que cobra es un autonomo que tiene que emitir
+  // factura, y sin esto tiene que hacerla el por su cuenta y a mano.
+  taxId          String? // NIF
+  billingAddress String?
+  // Retencion de IRPF que aplica en sus facturas. 15% es lo habitual; 7% los
+  // tres primeros anios de actividad. 0 si no procede.
+  irpfRate       Int     @default(0)
 
   // Tarifas en euros
   ratePost  Int @default(0)
@@ -109,11 +133,24 @@ model Creator {
   applications   Application[]
   deals          Deal[]
   savedBy        SavedCreator[]
-  reviews        Review[]        @relation("ReviewTarget")
+  reviews        Review[]             @relation("ReviewTarget")
   rankHistory    RankSnapshot[]
   shopifyLinks   ShopifyAttribution[]
 }
 
+// Una cuenta de red social del creador.
+//
+// Hay dos formas de que existan estos numeros y no valen lo mismo:
+//
+//  - DECLARED: los escribio el creador. Sirven para empezar, pero nadie los ha
+//    comprobado, y un ranking que ordena por datos que el interesado se pone a
+//    si mismo premia a quien exagera.
+//  - CONNECTED: el creador conecto la cuenta y los trae la API de la
+//    plataforma. Los seguidores son los de verdad y el engagement sale de sus
+//    publicaciones reales, no de una media que alguien recuerda.
+//
+// Por eso source se guarda junto al dato y viaja con el hasta la interfaz: la
+// empresa tiene derecho a saber cual de los dos esta mirando.
 model SocialAccount {
   id         String  @id @default(cuid())
   creatorId  String
@@ -125,7 +162,78 @@ model SocialAccount {
   engagement Float   @default(0)
   avgViews   Int     @default(0)
 
+  source String @default("DECLARED") // DECLARED | CONNECTED
+
+  // Credenciales de la conexion. Los tokens van cifrados (lib/secrets.js): son
+  // la llave de la cuenta de otra persona, y una copia de seguridad de la base
+  // no deberia ser una lista de accesos a cuentas ajenas.
+  externalId   String?
+  accessToken  String?
+  refreshToken String?
+  tokenExpires DateTime?
+  scopes       String?
+  connectedAt  DateTime?
+  lastSyncAt   DateTime?
+  syncError    String?
+
+  // Lo que se calcula de las publicaciones traidas, no de lo que diga nadie.
+  postsAnalyzed Int       @default(0)
+  postsPerWeek  Float     @default(0)
+  avgLikes      Int       @default(0)
+  avgComments   Int       @default(0)
+  lastPostAt    DateTime?
+
+  posts     SocialPost[]
+  snapshots SocialSnapshot[]
+
   @@unique([creatorId, platform])
+  @@index([source])
+}
+
+// Una publicacion traida de la plataforma.
+//
+// Se guardan las ultimas para poder calcular el engagement y la frecuencia
+// nosotros mismos, y para poder ensenar de donde sale cada cifra. Sin esto el
+// engagement seria otro numero opaco que hay que creerse.
+model SocialPost {
+  id           String        @id @default(cuid())
+  accountId    String
+  account      SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  externalId   String
+  permalink    String?
+  mediaType    String? // IMAGE | VIDEO | CAROUSEL | REEL | SHORT
+  caption      String?
+  thumbnailUrl String?
+
+  likes    Int  @default(0)
+  comments Int  @default(0)
+  views    Int  @default(0)
+  shares   Int  @default(0)
+  saves    Int  @default(0)
+  reach    Int?
+
+  publishedAt DateTime
+  fetchedAt   DateTime @default(now())
+
+  @@unique([accountId, externalId])
+  @@index([accountId, publishedAt])
+}
+
+// Foto de las metricas en un momento dado.
+//
+// Permite ensenar la evolucion y, sobre todo, detectar saltos imposibles: mil
+// seguidores nuevos en un dia sin una publicacion que lo explique es la firma
+// de los seguidores comprados.
+model SocialSnapshot {
+  id           String        @id @default(cuid())
+  accountId    String
+  account      SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  followers    Int
+  engagement   Float
+  postsPerWeek Float         @default(0)
+  takenAt      DateTime      @default(now())
+
+  @@index([accountId, takenAt])
 }
 
 model PortfolioItem {
@@ -208,10 +316,80 @@ model Deal {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  messages Message[]
-  reviews  Review[]
-  payments Payment[]
+  messages     Message[]
+  reviews      Review[]
+  payments     Payment[]
   shopifyLinks ShopifyAttribution[]
+  submissions  ContentSubmission[]
+  invoices     Invoice[]
+}
+
+// Una entrega de contenido para que la empresa la revise.
+//
+// Antes esto era un contentUrl y un cambio de estado, lo que funciona hasta
+// que alguien pide un cambio: entonces no hay forma de saber que se pidio, ni
+// sobre que version, ni cuando. Y el dinero retenido se libera justo aqui, asi
+// que la conversacion sobre si el contenido vale o no es precisamente la que
+// hay que dejar por escrito.
+model ContentSubmission {
+  id      String  @id @default(cuid())
+  dealId  String
+  deal    Deal    @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  version Int
+  url     String
+  note    String? // lo que dice el creador al entregar
+
+  status     String    @default("PENDING") // PENDING | CHANGES_REQUESTED | APPROVED
+  feedback   String? // lo que contesta la empresa
+  reviewedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@unique([dealId, version])
+  @@index([dealId])
+}
+
+// Factura de una colaboracion.
+//
+// Son dos documentos distintos y conviene no confundirlos:
+//  - CREATOR_TO_BRAND: la que el creador (autonomo) emite a la empresa por su
+//    trabajo. Lleva IVA y, si el creador lo indica, retencion de IRPF.
+//  - MIKRO_COMMISSION: la que Mikro emite al creador por su comision.
+//
+// Los importes van en centimos y como enteros. El resto del modelo usa euros
+// enteros porque las tarifas son redondas, pero una factura con IVA no lo es:
+// el 21% de 250 son 52,50, y redondear eso es emitir un documento mal.
+model Invoice {
+  id     String @id @default(cuid())
+  dealId String
+  deal   Deal   @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  kind   String // CREATOR_TO_BRAND | MIKRO_COMMISSION
+
+  series String // "C2026" | "M2026"
+  number String // numero completo y correlativo: "C2026-0001"
+
+  // Quien emite y quien recibe, congelados en el momento de emitir: si manana
+  // el creador cambia de domicilio, la factura de hace un ano no cambia.
+  issuerName    String
+  issuerTaxId   String?
+  issuerAddress String?
+  clientName    String
+  clientTaxId   String?
+  clientAddress String?
+
+  concept    String
+  baseCents  Int
+  vatRate    Int    @default(21)
+  vatCents   Int
+  irpfRate   Int    @default(0)
+  irpfCents  Int    @default(0)
+  totalCents Int
+
+  issuedAt  DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  @@unique([number])
+  @@index([dealId])
 }
 
 model Payment {
@@ -325,16 +503,16 @@ model DemoRequest {
 // tambien el de refresco y la fecha de caducidad, y quien pide el token se
 // encarga de renovarlo antes de usarlo.
 model ShopifyShop {
-  id           String  @id @default(cuid())
-  domain       String  @unique // tienda.myshopify.com
+  id          String  @id @default(cuid())
+  domain      String  @unique // tienda.myshopify.com
   // El dominio publico, que no suele ser el de myshopify. Los enlaces que
   // comparte un creador llevan este: nadie pone un .myshopify.com en su bio.
-  publicHost   String?
-  name         String?
-  email        String?
-  currency     String  @default("EUR")
-  countryCode  String?
-  planName     String?
+  publicHost  String?
+  name        String?
+  email       String?
+  currency    String  @default("EUR")
+  countryCode String?
+  planName    String?
 
   accessToken  String?
   refreshToken String?
@@ -380,23 +558,23 @@ model ShopifyAttribution {
   dealId     String?
   deal       Deal?     @relation(fields: [dealId], references: [id], onDelete: SetNull)
 
-  code            String // MIKRO-MARTA-7F3K
-  discountGid     String? // el descuento creado en Shopify
-  percentage      Int     @default(10)
+  code        String // MIKRO-MARTA-7F3K
+  discountGid String? // el descuento creado en Shopify
+  percentage  Int       @default(10)
   // Destino del enlace que se comparte, guardado como ruta de la tienda
   // ("/products/x"). Ruta y no URL entera: asi el enlace no puede acabar
   // llevando a otro dominio.
-  landingUrl      String?
-  status          String  @default("ACTIVE") // ACTIVE | PAUSED | ENDED
-  startsAt        DateTime @default(now())
-  endsAt          DateTime?
+  landingUrl  String?
+  status      String    @default("ACTIVE") // ACTIVE | PAUSED | ENDED
+  startsAt    DateTime  @default(now())
+  endsAt      DateTime?
 
   // Agregados: evitan recorrer todos los pedidos para pintar un panel.
   // salesTotal es bruto; lo devuelto se guarda aparte para poder enseniar las
   // dos cifras. Restarlo sin mas escondria que hubo una venta y una devolucion.
-  ordersCount    Int   @default(0)
-  salesTotal     Float @default(0)
-  refundedTotal  Float @default(0)
+  ordersCount   Int   @default(0)
+  salesTotal    Float @default(0)
+  refundedTotal Float @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -423,8 +601,8 @@ model ShopifyOrder {
   refundedTotal Float    @default(0)
   currency      String   @default("EUR")
   discountCode  String?
-  processedAt DateTime @default(now())
-  createdAt   DateTime @default(now())
+  processedAt   DateTime @default(now())
+  createdAt     DateTime @default(now())
 
   refunds ShopifyRefund[]
 
