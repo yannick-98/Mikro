@@ -74,7 +74,11 @@ export function resetStripe() {
 }
 
 export const webhookSecret = () => process.env.STRIPE_WEBHOOK_SECRET || ''
-export const publishableKey = () => process.env.STRIPE_PUBLISHABLE_KEY || ''
+
+// No hay clave publica. El pago ocurre en una pagina alojada por Stripe, asi
+// que el navegador nunca habla con Stripe desde nuestro codigo y no hay nada
+// que publicar. Si algun dia se monta un formulario propio hara falta, y con
+// ella el cumplimiento de PCI que ahora nos ahorramos.
 
 export const APP_URL = () =>
   (process.env.APP_URL || process.env.SHOPIFY_APP_URL || process.env.URL || 'http://localhost:5173').replace(
