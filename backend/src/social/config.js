@@ -6,7 +6,22 @@
  * no esta disponible, en vez de ofrecer un boton que lleva a un error.
  */
 
-export const APP_URL = () => (process.env.APP_URL || 'http://localhost:5173').replace(/\/$/, '')
+/**
+ * El dominio publico de Mikro.
+ *
+ * Aqui vuelve el creador despues de autorizar, asi que equivocarse manda a la
+ * gente a un localhost que no existe. Por eso hay varias redes de seguridad:
+ * APP_URL si se ha puesto, el que ya usa la app de Shopify, y URL, que
+ * Netlify define sola en cada despliegue. El localhost queda solo para
+ * desarrollo.
+ */
+export const APP_URL = () =>
+  (
+    process.env.APP_URL ||
+    process.env.SHOPIFY_APP_URL ||
+    process.env.URL ||
+    'http://localhost:5173'
+  ).replace(/\/$/, '')
 
 /** A donde vuelve la plataforma despues de que el creador autorice. */
 export const redirectUri = (platform) =>
