@@ -27,7 +27,6 @@
   },
   "dependencies": {
     "@fontsource/inter": "^5.1.0",
-    "@netlify/database": "^1.1.0",
     "@prisma/client": "^5.22.0",
     "bcryptjs": "^2.4.3",
     "clsx": "^2.1.1",
