@@ -17,9 +17,19 @@
   external_node_modules = ["@prisma/client", ".prisma"]
   # Los datos viven en Postgres: a la funcion solo le hace falta el cliente de
   # Prisma con su motor nativo y el esquema.
+  # El motor de Windows no pinta nada en una funcion que corre en Linux, y
+  # ocupa 18 MB. Los .tmp son restos de un "prisma generate" interrumpido: en
+  # Windows, si el fichero esta en uso, el renombrado final falla y la copia a
+  # medias se queda ahi. Trece de esos restos llegaron a sumar 239 MB y
+  # tumbaron el despliegue por superar el limite de 250 MB de la funcion.
+  #
+  # El limite tampoco es el problema de fondo: lo es que un comodin arrastre
+  # lo que encuentre. Aqui se dice que no entra.
   included_files = [
     "backend/prisma/schema.prisma",
     "node_modules/.prisma/client/**",
+    "!node_modules/.prisma/client/*windows*",
+    "!node_modules/.prisma/client/*.tmp*",
     "node_modules/@prisma/client/**"
   ]
 
