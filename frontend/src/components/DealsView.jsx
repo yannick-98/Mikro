@@ -23,6 +23,50 @@ const ACTIONS = {
 
 const STEPS = ['ACCEPTED', 'FUNDED', 'IN_PROGRESS', 'SUBMITTED', 'APPROVED', 'PAID']
 
+/**
+ * Lo que se cobra, con lo seguro separado de lo que depende de las ventas.
+ *
+ * Es la regla de toda esta funcion: juntarlos en un solo numero haria pasar
+ * una expectativa por un sueldo. El fijo esta en garantia; el variable
+ * todavia no existe y puede acabar en cero.
+ */
+function Importe({ deal, role }) {
+  const r = deal.reparto
+  const conVariable = r?.pendienteDeVentas
+
+  return (
+    <div className="text-right">
+      <p className="text-[11px] font-bold uppercase tracking-wide text-ink/35">
+        {role === 'BRAND' ? 'Importe' : conVariable ? 'Seguro' : 'Recibes'}
+      </p>
+      <p className="text-[22px] font-black leading-none">
+        {formatEuro(role === 'BRAND' ? deal.fee : deal.netToCreator)}
+      </p>
+      {role === 'CREATOR' ? (
+        <p className="mt-1 text-[11.5px] text-ink/40">
+          {formatEuro(deal.fee)} − {formatEuro(deal.feePlatform)} comision
+        </p>
+      ) : (
+        <p className="mt-1 text-[11.5px] text-ink/40">comision incluida</p>
+      )}
+
+      {conVariable ? (
+        <div className="mt-2 rounded-lg bg-brand-50 px-2.5 py-1.5 text-right">
+          <p className="text-[10.5px] font-bold uppercase tracking-wide text-brand-700/70">
+            {r.commissionPct}% de ventas
+          </p>
+          <p className="text-[15px] font-black leading-tight text-brand-800">
+            {formatEuro(role === 'BRAND' ? r.variable : r.variableNeto)}
+          </p>
+          <p className="text-[10.5px] text-brand-700/60">
+            {r.ventasNetas > 0 ? `sobre ${formatEuro(r.ventasNetas)} vendidos` : 'aún sin ventas'}
+          </p>
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
 function Progress({ status }) {
   const index = STEPS.indexOf(status)
   if (status === 'CANCELLED') {
@@ -411,19 +455,7 @@ export default function DealsView({ role, meId }) {
                     ) : null}
                   </div>
 
-                  <div className="text-right">
-                    <p className="text-[11px] font-bold uppercase tracking-wide text-ink/35">
-                      {role === 'BRAND' ? 'Importe' : 'Recibes'}
-                    </p>
-                    <p className="text-[22px] font-black leading-none">
-                      {formatEuro(role === 'BRAND' ? d.fee : d.netToCreator)}
-                    </p>
-                    {role === 'CREATOR' ? (
-                      <p className="mt-1 text-[11.5px] text-ink/40">{formatEuro(d.fee)} − {formatEuro(d.feePlatform)} comision</p>
-                    ) : (
-                      <p className="mt-1 text-[11.5px] text-ink/40">comision incluida</p>
-                    )}
-                  </div>
+                  <Importe deal={d} role={role} />
                 </div>
 
                 <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-black/[0.06] pt-4">

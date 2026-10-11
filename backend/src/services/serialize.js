@@ -1,3 +1,5 @@
+import { ofertaCampana } from './pay.js'
+
 /** Formas publicas de los modelos: nada de hashes ni datos internos. */
 
 export function publicCreator(creator, extra = {}) {
@@ -134,6 +136,11 @@ export function publicCampaign(campaign, extra = {}) {
     deliverables: campaign.deliverables ? campaign.deliverables.split(',').map((s) => s.trim()) : [],
     budgetMin: campaign.budgetMin,
     budgetMax: campaign.budgetMax,
+    // Que se promociona y como se paga. Va junto al presupuesto porque es
+    // parte de la misma decision: un creador no puede valorar "150-400 EUR"
+    // sin saber si son seguros o dependen de lo que venda.
+    kind: campaign.kind,
+    oferta: ofertaCampana(campaign),
     targetCity: campaign.targetCity,
     minFollowers: campaign.minFollowers,
     maxFollowers: campaign.maxFollowers,

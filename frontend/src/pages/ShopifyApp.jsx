@@ -460,9 +460,10 @@ export default function ShopifyApp({ vista = 'panel' }) {
 function FormularioCodigo({ campaign, llamar, creando, onCrear, ajustes, host }) {
   const [creadores, setCreadores] = useState(null)
   const [creatorId, setCreatorId] = useState('')
-  // Los valores de partida salen de la configuracion de la tienda, no de un
-  // numero escrito aqui: si no, los ajustes no servirian para nada.
-  const [percentage, setPercentage] = useState(ajustes.defaultPercentage)
+  // El descuento de partida lo decide la campana, que es donde se penso la
+  // oferta; si esa campana no fijo ninguno, se cae al ajuste general de la
+  // tienda. Escribir aqui un numero a fuego haria inutiles las dos cosas.
+  const [percentage, setPercentage] = useState(campaign.discountPct || ajustes.defaultPercentage)
   const [code, setCode] = useState('')
   const [tocado, setTocado] = useState(false)
   const [landing, setLanding] = useState('')
@@ -513,7 +514,7 @@ function FormularioCodigo({ campaign, llamar, creando, onCrear, ajustes, host })
           setCode('')
           setTocado(false)
           setLanding('')
-          setPercentage(ajustes.defaultPercentage)
+          setPercentage(campaign.discountPct || ajustes.defaultPercentage)
         }
       }}
     >

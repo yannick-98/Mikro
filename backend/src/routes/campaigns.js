@@ -6,6 +6,7 @@ import { requireAuth, requireRole } from '../middleware/auth.js'
 import { publicCampaign, publicCreator } from '../services/serialize.js'
 import { matchScore } from '../services/scoring.js'
 import { notify } from '../services/notify.js'
+import { validarOferta } from '../services/pay.js'
 
 const router = Router()
 
@@ -24,7 +25,48 @@ const campaignSchema = z.object({
   startDate: z.string().optional(),
   endDate: z.string().optional(),
   status: z.enum(['DRAFT', 'OPEN', 'CLOSED', 'COMPLETED']).optional(),
+  kind: z.enum(['PRODUCT', 'SERVICE']).optional(),
+  payModel: z.enum(['FIXED', 'FIXED_VARIABLE', 'VARIABLE']).optional(),
+  commissionPct: z.number().int().min(0).max(50).optional(),
+  discountPct: z.number().int().min(0).max(70).optional(),
 })
+
+/**
+ * Comprueba que la oferta se puede cumplir.
+ *
+ * La comision se paga sobre las ventas atribuidas al codigo del creador, y
+ * eso solo existe si la empresa tiene su tienda conectada. Sin esa
+ * comprobacion se podria publicar una oferta que nadie puede liquidar, que es
+ * la peor forma de estrenar un modelo de pago nuevo.
+ */
+async function comprobarOferta(brandId, data) {
+  const payModel = data.payModel || 'FIXED'
+  const kind = data.kind || 'PRODUCT'
+  const discountPct = data.discountPct || 0
+
+  // La tienda solo se consulta si hace falta: una campana de pago fijo sin
+  // descuento no necesita saber nada de Shopify.
+  const tienda =
+    payModel === 'FIXED' && !discountPct
+      ? null
+      : await prisma.shopifyShop.findFirst({
+          where: { brandId, uninstalledAt: null },
+          select: { id: true },
+        })
+
+  const error = validarOferta({
+    kind,
+    payModel,
+    commissionPct: data.commissionPct,
+    discountPct,
+    budgetMin: data.budgetMin,
+    budgetMax: data.budgetMax,
+    tieneTienda: !!tienda,
+  })
+  if (error) throw badRequest(error)
+
+  return { kind, payModel, commissionPct: payModel === 'FIXED' ? 0 : data.commissionPct, discountPct }
+}
 
 /** Campanas abiertas: escaparate para creadores. */
 router.get(
@@ -173,9 +215,12 @@ router.post(
     const data = parseBody(campaignSchema, req.body)
     if (data.budgetMax < data.budgetMin) throw badRequest('El presupuesto maximo no puede ser menor que el minimo')
 
+    const oferta = await comprobarOferta(req.user.brand.id, data)
+
     const campaign = await prisma.campaign.create({
       data: {
         ...data,
+        ...oferta,
         brandId: req.user.brand.id,
         startDate: data.startDate ? new Date(data.startDate) : null,
         endDate: data.endDate ? new Date(data.endDate) : null,
@@ -196,10 +241,32 @@ router.patch(
     if (existing.brandId !== req.user.brand.id) throw forbidden()
 
     const data = parseBody(campaignSchema.partial(), req.body)
+
+    // Si se toca el modelo de pago, se vuelve a comprobar: cambiar una
+    // campana a comision sin tienda conectada dejaria una oferta que nadie
+    // puede liquidar. Lo ya pactado con quien acepto antes no se mueve,
+    // porque cada colaboracion guarda sus propias condiciones.
+    const tocaElPago =
+      data.payModel !== undefined ||
+      data.commissionPct !== undefined ||
+      data.kind !== undefined ||
+      data.discountPct !== undefined
+    const oferta = tocaElPago
+      ? await comprobarOferta(req.user.brand.id, {
+          kind: data.kind ?? existing.kind,
+          payModel: data.payModel ?? existing.payModel,
+          commissionPct: data.commissionPct ?? existing.commissionPct,
+          discountPct: data.discountPct ?? existing.discountPct,
+          budgetMin: data.budgetMin ?? existing.budgetMin,
+          budgetMax: data.budgetMax ?? existing.budgetMax,
+        })
+      : {}
+
     const campaign = await prisma.campaign.update({
       where: { id: req.params.id },
       data: {
         ...data,
+        ...oferta,
         startDate: data.startDate ? new Date(data.startDate) : undefined,
         endDate: data.endDate ? new Date(data.endDate) : undefined,
       },

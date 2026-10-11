@@ -312,6 +312,11 @@ router.get(
           status: c.status,
           budgetMin: c.budgetMin,
           budgetMax: c.budgetMax,
+          // El descuento que decidio la campana: el formulario lo usa como
+          // valor de partida en vez del ajuste general de la tienda.
+          discountPct: c.discountPct,
+          payModel: c.payModel,
+          commissionPct: c.commissionPct,
           applications: c._count.applications,
           deals: c._count.deals,
           attributions: codigos,
@@ -370,7 +375,12 @@ router.post(
     const code = data.code
       ? normalizeCode(data.code)
       : buildCode(creator?.handle || campaign.title, req.shop.codePrefix)
-    const percentage = data.percentage ?? req.shop.defaultPercentage
+    // El descuento, por orden de quien manda: lo que escriba la tienda ahora,
+    // lo que decidio la campana al publicarse, y si ninguna de las dos cosas,
+    // el valor por defecto de la tienda. La campana va antes que el ajuste
+    // general porque es una decision comercial concreta y el ajuste solo es
+    // una preferencia.
+    const percentage = data.percentage ?? (campaign.discountPct || req.shop.defaultPercentage)
     if (data.code && code.length < 3) throw badRequest('El codigo necesita al menos 3 letras o numeros')
 
     // El destino se valida antes de crear nada en Shopify: un enlace mal

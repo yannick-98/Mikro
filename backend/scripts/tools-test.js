@@ -13,6 +13,7 @@ const { tarifaOrientativa, tramoDe, explicar, elegirNiveles, TRAMOS } = await im
 )
 const { calcular, IVA } = await import('../src/services/invoice.js')
 const { redactarBrief, PREGUNTAS } = await import('../src/services/brief.js')
+const { repartoDeal, ofertaCampana, validarOferta } = await import('../src/services/pay.js')
 
 let passed = 0
 let failed = 0
@@ -197,6 +198,161 @@ check(
   ['ventas', 'notoriedad', 'lanzamiento', 'contenido'].every(
     (o) => redactarBrief({ respuestas: { producto: 'x', objetivo: o } }).brief.length > 100,
   ),
+)
+
+// ---------------------------------------------------------------------------
+console.log('\n--- Modelos de pago ---')
+
+process.env.PLATFORM_FEE_PCT = '12'
+
+const ventas = [{ salesTotal: 1000, refundedTotal: 200 }]
+
+const pagoFijo = repartoDeal({ payModel: 'FIXED', fee: 250, feePlatform: 30, commissionPct: 0 }, ventas)
+check('en fijo, el variable es cero', pagoFijo.variable === 0)
+check('el fijo entero esta garantizado', pagoFijo.garantizado === 220, `${pagoFijo.garantizado}`)
+check('y no queda nada pendiente de ventas', pagoFijo.pendienteDeVentas === false)
+
+const mixto = repartoDeal(
+  { payModel: 'FIXED_VARIABLE', fee: 100, feePlatform: 12, commissionPct: 10 },
+  ventas,
+)
+check('la venta neta descuenta devoluciones', mixto.ventasNetas === 800, `${mixto.ventasNetas}`)
+check('el 10% de 800 son 80', mixto.variable === 80, `${mixto.variable}`)
+check('Mikro cobra su comision tambien del variable', mixto.variableNeto === 70.4, `${mixto.variableNeto}`)
+check('el total suma las dos partes', mixto.total === 180)
+
+// Lo que de verdad importa: lo seguro no incluye el variable.
+check('solo el fijo esta garantizado', mixto.garantizado === 88, `${mixto.garantizado}`)
+check('y se avisa de que hay parte pendiente', mixto.pendienteDeVentas === true)
+
+const soloVariable = repartoDeal(
+  { payModel: 'VARIABLE', fee: 0, feePlatform: 0, commissionPct: 20 },
+  ventas,
+)
+check('en solo variable no hay fijo', soloVariable.fijo === 0)
+check('nada esta garantizado', soloVariable.garantizado === 0)
+check('el variable se calcula igual', soloVariable.variable === 160, `${soloVariable.variable}`)
+
+const sinVentas = repartoDeal({ payModel: 'VARIABLE', fee: 0, feePlatform: 0, commissionPct: 20 }, [])
+check('sin ventas, el variable es cero y no NaN', sinVentas.variable === 0)
+check('sin ventas el total es cero', sinVentas.total === 0)
+
+// Una devolucion mayor que la venta no puede generar comision negativa.
+const todoDevuelto = repartoDeal(
+  { payModel: 'VARIABLE', fee: 0, feePlatform: 0, commissionPct: 20 },
+  [{ salesTotal: 300, refundedTotal: 400 }],
+)
+check('devolver mas de lo vendido no deja saldo negativo', todoDevuelto.variable === 0, `${todoDevuelto.variable}`)
+
+console.log('\n--- Que oferta se puede publicar ---')
+
+const conTienda = { tieneTienda: true, budgetMin: 100, budgetMax: 300 }
+check('fijo siempre vale', validarOferta({ kind: 'PRODUCT', payModel: 'FIXED', ...conTienda }) === null)
+check(
+  'comision sin tienda conectada se rechaza',
+  (validarOferta({
+    kind: 'PRODUCT',
+    payModel: 'VARIABLE',
+    commissionPct: 10,
+    budgetMin: 0,
+    budgetMax: 0,
+    tieneTienda: false,
+  }) || '').includes('tienda conectada'),
+)
+check(
+  'un servicio no puede pagar por comision',
+  (validarOferta({ kind: 'SERVICE', payModel: 'FIXED_VARIABLE', commissionPct: 10, ...conTienda }) || '')
+    .includes('campañas de producto'),
+)
+check(
+  'una comision del 80% se rechaza',
+  validarOferta({
+    kind: 'PRODUCT',
+    payModel: 'VARIABLE',
+    commissionPct: 80,
+    budgetMin: 0,
+    budgetMax: 0,
+    tieneTienda: true,
+  }) !== null,
+)
+check(
+  'comision valida con tienda pasa',
+  validarOferta({
+    kind: 'PRODUCT',
+    payModel: 'VARIABLE',
+    commissionPct: 15,
+    budgetMin: 0,
+    budgetMax: 0,
+    tieneTienda: true,
+  }) === null,
+)
+check(
+  'un mixto sin importe fijo se rechaza',
+  validarOferta({
+    kind: 'PRODUCT',
+    payModel: 'FIXED_VARIABLE',
+    commissionPct: 10,
+    budgetMin: 0,
+    budgetMax: 0,
+    tieneTienda: true,
+  }) !== null,
+)
+check('un modelo inventado se rechaza', validarOferta({ payModel: 'REGALO' }) !== null)
+
+console.log('\n--- Lo que se ensena de una campana ---')
+
+const ofertaMixta = ofertaCampana({ payModel: 'FIXED_VARIABLE', budgetMin: 100, budgetMax: 200, commissionPct: 10 })
+check('se ve el tramo fijo', ofertaMixta.fijo.min === 100 && ofertaMixta.fijo.max === 200)
+check('y la comision', ofertaMixta.commissionPct === 10)
+check('lo garantizado es el minimo del fijo', ofertaMixta.garantizado === 100)
+
+const ofertaVar = ofertaCampana({ payModel: 'VARIABLE', budgetMin: 0, budgetMax: 0, commissionPct: 25 })
+check('en solo comision no hay tramo fijo', ofertaVar.fijo === null)
+check('y lo garantizado es cero', ofertaVar.garantizado === 0)
+// No se estima cuanto puede llegar a ganar: nadie lo sabe, y una cifra
+// inventada aqui hace que alguien acepte un trato que no le compensa.
+check('no se estima la ganancia posible', ofertaVar.estimado === undefined)
+
+console.log('\n--- Descuento del codigo ---')
+
+const base = { kind: 'PRODUCT', payModel: 'FIXED', budgetMin: 100, budgetMax: 300, tieneTienda: true }
+
+check('un descuento normal pasa', validarOferta({ ...base, discountPct: 15 }) === null)
+check('sin descuento tambien', validarOferta({ ...base, discountPct: 0 }) === null)
+check('un 80% se rechaza', validarOferta({ ...base, discountPct: 80 }) !== null)
+check('un descuento negativo se rechaza', validarOferta({ ...base, discountPct: -5 }) !== null)
+
+// Descuento y comision se multiplican, no se suman: es la cuenta que nadie
+// hace hasta que llega la factura.
+const exprimido = validarOferta({
+  kind: 'PRODUCT',
+  payModel: 'VARIABLE',
+  commissionPct: 25,
+  discountPct: 40,
+  budgetMin: 0,
+  budgetMax: 0,
+  tieneTienda: true,
+})
+check('descuento alto con comision alta avisa', (exprimido || '').includes('poco margen'))
+check(
+  'descuento alto con comision baja no molesta',
+  validarOferta({
+    kind: 'PRODUCT',
+    payModel: 'VARIABLE',
+    commissionPct: 8,
+    discountPct: 40,
+    budgetMin: 0,
+    budgetMax: 0,
+    tieneTienda: true,
+  }) === null,
+)
+
+const conDescuento = ofertaCampana({ payModel: 'FIXED', budgetMin: 100, budgetMax: 200, discountPct: 20 })
+check('el descuento viaja en la oferta', conDescuento.discountPct === 20)
+check('aunque el pago sea fijo', conDescuento.payModel === 'FIXED')
+check(
+  'sin descuento, cero y no undefined',
+  ofertaCampana({ payModel: 'FIXED', budgetMin: 100, budgetMax: 200 }).discountPct === 0,
 )
 
 console.log(`\n=== ${passed} correctas, ${failed} fallidas ===\n`)

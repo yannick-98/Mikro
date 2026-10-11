@@ -168,3 +168,60 @@ npm run test:social   # métricas y cifrado — 39
 npm run test:shopify  # firmas, tokens y enlaces — 55
 npm test              # las tres
 ```
+
+---
+
+## 8. Qué se promociona y cómo se paga
+
+Una campaña dice ahora si promociona **un producto** o **un servicio**, y en
+las de producto la empresa elige cómo paga:
+
+| Modelo | Qué cobra el creador |
+|---|---|
+| **Fijo** | Un importe acordado, pase lo que pase |
+| **Fijo + comisión** | Un importe seguro más un % de lo que venda |
+| **Solo comisión** | Únicamente un % de lo que venda |
+
+### Las tres reglas que gobiernan esto
+
+**1. La comisión exige tienda conectada.** Se calcula sobre las ventas
+atribuidas al código del creador, que es justo lo que mide la app de Shopify.
+Sin tienda esa cifra no existe, así que las opciones con variable se
+desactivan y se dice por qué. No es un requisito técnico que nos venga bien:
+es la única forma de que el número exista. Dejar publicar una oferta que luego
+nadie puede liquidar sería la peor manera de estrenar un modelo de pago.
+
+**2. Los servicios solo pagan fijo.** Una clase de yoga también se vende, pero
+hoy no sabemos medir esa venta. Prometer una comisión sobre algo que no vamos
+a poder contar es una promesa que se rompe delante del creador.
+
+**3. Lo seguro y lo variable no se suman nunca en la interfaz.** `repartoDeal`
+devuelve las dos partes por separado y un campo `garantizado`, y las pantallas
+las pintan separadas. Enseñar «100 € + 10%» como si fueran 250 sería venderle
+a alguien una expectativa como si fuera un sueldo. En las campañas sin fijo se
+le dice al creador, con esas palabras, que si no vende no cobra.
+
+Las condiciones se **congelan en la colaboración** al aceptar la candidatura.
+La campaña puede cambiar mañana; el trato cerrado con esa persona, no.
+
+La comisión se calcula sobre la venta **neta de devoluciones**: pagar sobre un
+pedido que la tienda ha tenido que reintegrar sería el peor error posible en
+una cifra que decide a quién se paga. Una devolución mayor que la venta deja
+el variable en cero, nunca en negativo.
+
+### El descuento del código
+
+La campaña fija también **qué descuento llevará el código** del creador. Vive
+aquí y no en los ajustes de la tienda porque es una decisión comercial
+concreta: la misma marca hace un 10 % en una campaña y un 25 % en una
+liquidación. Cuando se crea el código desde el admin de Shopify, ese es el
+valor de partida; el ajuste general de la tienda queda como última red.
+
+Para el creador no es un detalle administrativo, es su argumento de venta, así
+que aparece en la oferta que ve antes de postularse.
+
+**Y una cuenta que casi nadie hace hasta que es tarde:** el descuento sale del
+precio y la comisión sale de lo que queda, así que no se suman, se multiplican.
+El formulario la hace en voz alta mientras escribes — «de cada 100 €, el
+cliente paga 70 y de ahí salen 7 para el creador; te quedan 63» — y rechaza
+las combinaciones que no dejan margen.

@@ -7,6 +7,7 @@ import { DashboardShell, StatusPill } from '../../components/Dashboard'
 import { EmptyState, Modal, Spinner, Toast, useAsync, useToast } from '../../components/ui'
 import AsistenteBrief from '../../components/AsistenteBrief'
 import PrecioReferencia from '../../components/PrecioReferencia'
+import ModeloDePago, { OfertaResumen } from '../../components/ModeloDePago'
 import { CAMPAIGN_STATUS, formatDate, formatEuro } from '../../lib/format'
 import { BRAND_NAV } from './nav'
 
@@ -21,6 +22,10 @@ const FILTERS = [
 const EMPTY = {
   title: '',
   brief: '',
+  kind: 'PRODUCT',
+  payModel: 'FIXED',
+  commissionPct: 10,
+  discountPct: 0,
   category: 'Gastronomia',
   deliverables: '1 reel, 3 stories',
   budgetMin: 150,
@@ -33,7 +38,7 @@ const EMPTY = {
   status: 'OPEN',
 }
 
-function CampaignForm({ open, onClose, onCreated, facets }) {
+function CampaignForm({ open, onClose, onCreated, facets, tieneTienda }) {
   const [asistente, setAsistente] = useState(false)
   const [form, setForm] = useState(EMPTY)
   const [saving, setSaving] = useState(false)
@@ -56,8 +61,12 @@ function CampaignForm({ open, onClose, onCreated, facets }) {
     try {
       const { campaign } = await api.createCampaign({
         ...form,
-        budgetMin: Number(form.budgetMin),
-        budgetMax: Number(form.budgetMax),
+        // Una campana sin fijo manda cero: dejar el presupuesto que hubiera
+        // quedado en el formulario publicaria un importe que nadie va a pagar.
+        budgetMin: form.payModel === 'VARIABLE' ? 0 : Number(form.budgetMin),
+        budgetMax: form.payModel === 'VARIABLE' ? 0 : Number(form.budgetMax),
+        commissionPct: form.payModel === 'FIXED' ? 0 : Number(form.commissionPct),
+        discountPct: form.kind === 'SERVICE' ? 0 : Number(form.discountPct),
         minFollowers: Number(form.minFollowers),
         maxFollowers: Number(form.maxFollowers),
         productValue: Number(form.productValue),
@@ -133,14 +142,32 @@ function CampaignForm({ open, onClose, onCreated, facets }) {
           <input required value={form.deliverables} onChange={set('deliverables')} className="field" placeholder="1 reel, 3 stories" />
         </div>
 
-        <div>
+        <div className="rounded-2xl border border-black/[0.08] bg-black/[0.015] p-4">
+          <ModeloDePago
+            valor={{
+              kind: form.kind,
+              payModel: form.payModel,
+              commissionPct: form.commissionPct,
+              discountPct: form.discountPct,
+            }}
+            onChange={(v) => setForm((f) => ({ ...f, ...v }))}
+            tieneTienda={tieneTienda}
+          />
+        </div>
+
+        {/* Sin importe fijo no hay presupuesto que pedir. */}
+        <div className={form.payModel === 'VARIABLE' ? 'hidden' : undefined}>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="label">Presupuesto minimo (EUR)</label>
+              <label className="label">
+                {form.payModel === 'FIXED_VARIABLE' ? 'Importe fijo mínimo (EUR)' : 'Presupuesto minimo (EUR)'}
+              </label>
               <input type="number" min={0} value={form.budgetMin} onChange={setNum('budgetMin')} className="field" />
             </div>
             <div>
-              <label className="label">Presupuesto maximo (EUR)</label>
+              <label className="label">
+                {form.payModel === 'FIXED_VARIABLE' ? 'Importe fijo máximo (EUR)' : 'Presupuesto maximo (EUR)'}
+              </label>
               <input type="number" min={0} value={form.budgetMax} onChange={setNum('budgetMax')} className="field" />
             </div>
           </div>
@@ -214,6 +241,8 @@ function CampaignForm({ open, onClose, onCreated, facets }) {
 
 export default function BrandCampaigns() {
   const nav = useNavigate()
+  // Decide si esta empresa puede ofrecer pago por comision.
+  const { data: miEmpresa } = useAsync(() => api.myBrand(), [])
   const [params, setParams] = useSearchParams()
   const [filter, setFilter] = useState('ALL')
   const [open, setOpen] = useState(false)
@@ -287,9 +316,7 @@ export default function BrandCampaigns() {
                     <span>{c.category}</span>
                     <span>{c.targetCity || 'Toda Espana'}</span>
                     <span>{c.deliverables.join(', ')}</span>
-                    <span className="text-ink">
-                      {formatEuro(c.budgetMin)} – {formatEuro(c.budgetMax)}
-                    </span>
+                    <OfertaResumen oferta={c.oferta} />
                     <span>Publicada el {formatDate(c.createdAt)}</span>
                   </div>
                 </div>
@@ -340,6 +367,7 @@ export default function BrandCampaigns() {
         open={open}
         onClose={() => setOpen(false)}
         facets={facets}
+        tieneTienda={!!miEmpresa?.tienda}
         onCreated={() => {
           show.success('Campana publicada. Ya puede recibir candidaturas.')
           reload()

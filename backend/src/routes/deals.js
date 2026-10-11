@@ -7,6 +7,7 @@ import { publicCampaign, publicCreator, publicBrand } from '../services/serializ
 import { recomputeCreator } from '../services/creatorStats.js'
 import { notify } from '../services/notify.js'
 import { emitirFacturas, publicInvoice } from '../services/invoice.js'
+import { repartoDeal } from '../services/pay.js'
 
 const router = Router()
 
@@ -18,6 +19,8 @@ const DEAL_INCLUDE = {
   reviews: true,
   submissions: { orderBy: { version: 'desc' } },
   invoices: true,
+  // Las ventas atribuidas a esta colaboracion: de ahi sale el variable.
+  shopifyLinks: true,
   _count: { select: { messages: true } },
 }
 
@@ -28,6 +31,10 @@ function serializeDeal(deal, viewerRole) {
     fee: deal.fee,
     feePlatform: deal.feePlatform,
     netToCreator: deal.fee - deal.feePlatform,
+    // El reparto separa lo seguro de lo que depende de las ventas. Nunca se
+    // devuelve solo el total: juntarlos haria pasar una expectativa por un
+    // sueldo.
+    reparto: repartoDeal(deal, deal.shopifyLinks || []),
     contentUrl: deal.contentUrl,
     notes: deal.notes,
     createdAt: deal.createdAt,

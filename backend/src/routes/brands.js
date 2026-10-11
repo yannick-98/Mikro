@@ -11,8 +11,18 @@ router.get(
   '/me',
   requireRole('BRAND'),
   asyncHandler(async (req, res) => {
-    const brand = await prisma.brand.findUnique({ where: { userId: req.user.id } })
-    res.json({ brand: publicBrand(brand) })
+    const brand = await prisma.brand.findUnique({
+      where: { userId: req.user.id },
+      include: { shopifyShop: { select: { domain: true, uninstalledAt: true } } },
+    })
+    // Si hay tienda conectada manda mucho mas de lo que parece: es lo que
+    // decide si esta empresa puede ofrecer pago por comision, porque sin ella
+    // no hay forma de saber que ha vendido cada creador.
+    const tienda = brand?.shopifyShop && !brand.shopifyShop.uninstalledAt ? brand.shopifyShop : null
+    res.json({
+      brand: publicBrand(brand),
+      tienda: tienda ? { domain: tienda.domain } : null,
+    })
   }),
 )
 

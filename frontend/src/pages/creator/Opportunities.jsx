@@ -1,15 +1,20 @@
 import { useState } from 'react'
 import clsx from 'clsx'
-import { Briefcase, Check, Package, Send } from 'lucide-react'
+import { AlertTriangle, Briefcase, Check, Package, Send, Tag, TrendingUp } from 'lucide-react'
 import { api } from '../../api/client'
 import { DashboardShell } from '../../components/Dashboard'
 import { Avatar, EmptyState, Modal, Spinner, Toast, useAsync, useToast } from '../../components/ui'
 import PrecioReferencia from '../../components/PrecioReferencia'
+import { OfertaResumen } from '../../components/ModeloDePago'
 import { formatDate, formatEuro, formatFollowers } from '../../lib/format'
 import { CREATOR_NAV } from './nav'
 
 function ApplyModal({ campaign, onClose, onDone }) {
-  const [fee, setFee] = useState(campaign ? Math.round((campaign.budgetMin + campaign.budgetMax) / 2) : 0)
+  const [fee, setFee] = useState(
+    campaign && campaign.oferta?.payModel !== 'VARIABLE'
+      ? Math.round((campaign.budgetMin + campaign.budgetMax) / 2)
+      : 0,
+  )
   const [message, setMessage] = useState('')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState(null)
@@ -37,13 +42,36 @@ function ApplyModal({ campaign, onClose, onDone }) {
             <p className="mt-1 text-[13px] text-ink/55">
               {campaign.brand?.companyName} · {campaign.deliverables.join(', ')}
             </p>
-            <p className="mt-2 text-[13px] font-bold">
-              Presupuesto: {formatEuro(campaign.budgetMin)} – {formatEuro(campaign.budgetMax)}
+            <p className="mt-2 text-[13px]">
+              <OfertaResumen oferta={campaign.oferta} />
             </p>
+            {campaign.oferta?.payModel === 'VARIABLE' ? (
+              <p className="mt-2 flex gap-2 rounded-lg bg-amber-50 px-2.5 py-2 text-[12.5px] leading-relaxed text-amber-900">
+                <AlertTriangle size={13} className="mt-0.5 shrink-0" />
+                <span>
+                  Esta campaña <strong>no paga nada fijo</strong>. Cobrarás el{' '}
+                  {campaign.oferta.commissionPct}% de lo que vendas con tu código y nada más, así
+                  que si no vende, no cobras. El riesgo es tuyo: míralo bien antes de aceptar.
+                </span>
+              </p>
+            ) : campaign.oferta?.commissionPct ? (
+              <p className="mt-2 flex gap-2 rounded-lg bg-brand-50 px-2.5 py-2 text-[12.5px] leading-relaxed text-brand-900">
+                <TrendingUp size={13} className="mt-0.5 shrink-0" />
+                <span>
+                  Además del fijo, te llevas el {campaign.oferta.commissionPct}% de lo que vendas
+                  con tu código, ya descontadas las devoluciones. Esa parte se liquida según
+                  entren los pedidos.
+                </span>
+              </p>
+            ) : null}
           </div>
 
-          <div>
-            <label className="label">Tu tarifa para esta campana (EUR)</label>
+          <div className={campaign.oferta?.payModel === 'VARIABLE' ? 'hidden' : undefined}>
+            <label className="label">
+              {campaign.oferta?.payModel === 'FIXED_VARIABLE'
+                ? 'Tu importe fijo para esta campana (EUR)'
+                : 'Tu tarifa para esta campana (EUR)'}
+            </label>
             <input
               required
               type="number"
@@ -167,6 +195,12 @@ export default function Opportunities() {
                     {c.endDate ? <span>Hasta el {formatDate(c.endDate)}</span> : null}
                   </div>
 
+                  {c.oferta?.discountPct ? (
+                    <p className="mt-2.5 inline-flex items-center gap-1.5 rounded-lg bg-black/[0.05] px-2.5 py-1 text-[12px] font-bold text-ink/65">
+                      <Tag size={13} /> Tu código dará un {c.oferta.discountPct}% a tus seguidores
+                    </p>
+                  ) : null}
+
                   {c.productValue > 0 ? (
                     <p className="mt-2.5 inline-flex items-center gap-1.5 rounded-lg bg-amber-50 px-2.5 py-1 text-[12px] font-bold text-amber-700">
                       <Package size={13} /> Incluye producto por valor de {formatEuro(c.productValue)}
@@ -176,10 +210,31 @@ export default function Opportunities() {
 
                 <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:items-end">
                   <div className="sm:text-right">
-                    <p className="text-[11px] font-bold uppercase tracking-wide text-ink/35">Presupuesto</p>
-                    <p className="text-[19px] font-black leading-none">
-                      {formatEuro(c.budgetMin)} – {formatEuro(c.budgetMax)}
+                    {/* Lo seguro, primero y grande. Lo que depende de las
+                        ventas, al lado y marcado: es lo que necesita saber
+                        quien decide si le compensa el trabajo. */}
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-ink/35">
+                      {c.oferta?.payModel === 'VARIABLE' ? 'Solo comisión' : 'Pago seguro'}
                     </p>
+                    {c.oferta?.fijo ? (
+                      <p className="text-[19px] font-black leading-none">
+                        {formatEuro(c.oferta.fijo.min)} – {formatEuro(c.oferta.fijo.max)}
+                      </p>
+                    ) : (
+                      <p className="text-[19px] font-black leading-none text-amber-700">
+                        {c.oferta?.commissionPct}%
+                      </p>
+                    )}
+                    {c.oferta?.commissionPct && c.oferta?.fijo ? (
+                      <p className="mt-1 text-[12px] font-bold text-brand-700">
+                        + {c.oferta.commissionPct}% de lo que vendas
+                      </p>
+                    ) : null}
+                    {c.oferta?.payModel === 'VARIABLE' ? (
+                      <p className="mt-1 text-[11.5px] font-semibold text-amber-700">
+                        sin pago fijo
+                      </p>
+                    ) : null}
                   </div>
                   <button
                     type="button"

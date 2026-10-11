@@ -268,6 +268,35 @@ model Campaign {
   brief        String
   category     String
   deliverables String // CSV: "1 reel, 3 stories"
+
+  // Que se promociona. Un producto se puede comprar, asi que su venta se
+  // puede medir y por tanto se puede pagar por resultado; un servicio, de
+  // momento, no. De ahi que solo las campanas de producto ofrezcan variable.
+  kind String @default("PRODUCT") // PRODUCT | SERVICE
+
+  // Como se paga al creador:
+  //   FIXED          un importe acordado, y ya.
+  //   FIXED_VARIABLE un importe acordado mas un porcentaje de lo que venda.
+  //   VARIABLE       solo el porcentaje.
+  //
+  // El variable no es una promesa vacia: se calcula sobre las ventas
+  // atribuidas al codigo del creador, que es justo lo que mide la app de
+  // Shopify. Por eso exigir tienda conectada no es un requisito tecnico que
+  // nos venga bien, es la unica forma de que la cifra exista.
+  payModel      String @default("FIXED")
+  commissionPct Int    @default(0) // % de la venta neta para el creador
+
+  // Descuento que llevara el codigo del creador. Lo decide la campana porque
+  // es parte de la oferta comercial, no una preferencia de la tienda: la
+  // misma marca puede hacer un 10% en una campana y un 25% en una
+  // liquidacion. Cero significa "usa el valor por defecto de la tienda".
+  //
+  // Ojo a la relacion con commissionPct: el descuento sale del precio de
+  // venta, asi que tambien reduce la base sobre la que se paga la comision.
+  // Un 30% de descuento con un 20% de comision es mucho mas caro de lo que
+  // parece sumando los dos numeros.
+  discountPct Int @default(0)
+
   budgetMin    Int
   budgetMax    Int
   targetCity   String?
@@ -310,6 +339,12 @@ model Deal {
   creator     Creator  @relation(fields: [creatorId], references: [id], onDelete: Cascade)
   fee         Int
   feePlatform Int      @default(0) // comision de Mikro
+
+  // Condiciones congeladas al aceptar la candidatura. La campana puede
+  // cambiar despues, pero lo pactado con esta persona no: nadie puede ver
+  // cambiado a la baja el trato que ya habia cerrado.
+  payModel      String @default("FIXED")
+  commissionPct Int    @default(0)
   status      String   @default("ACCEPTED") // ACCEPTED | FUNDED | IN_PROGRESS | SUBMITTED | APPROVED | PAID | CANCELLED
   contentUrl  String?
   notes       String?

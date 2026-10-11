@@ -45,7 +45,10 @@ router.post(
     await notify(campaign.brand.userId, {
       kind: 'APPLICATION',
       title: `Nueva candidatura en "${campaign.title}"`,
-      body: `${req.user.creator.displayName} se ha postulado por ${data.proposedFee} EUR`,
+      body:
+        campaign.payModel === 'VARIABLE'
+          ? `${req.user.creator.displayName} se ha postulado a comision (${campaign.commissionPct}% de ventas)`
+          : `${req.user.creator.displayName} se ha postulado por ${data.proposedFee} EUR`,
       link: `/empresa/campanas/${campaign.id}`,
     })
 
@@ -129,6 +132,10 @@ router.post(
           creatorId: application.creatorId,
           fee,
           feePlatform: Math.round((fee * feePct) / 100),
+          // Congeladas aqui: la campana puede cambiar manana, pero el trato
+          // cerrado con esta persona no.
+          payModel: application.campaign.payModel,
+          commissionPct: application.campaign.commissionPct,
           status: 'ACCEPTED',
         },
       }),
@@ -192,6 +199,10 @@ router.post(
           creatorId: application.creatorId,
           fee,
           feePlatform: Math.round((fee * feePct) / 100),
+          // Congeladas aqui: la campana puede cambiar manana, pero el trato
+          // cerrado con esta persona no.
+          payModel: application.campaign.payModel,
+          commissionPct: application.campaign.commissionPct,
           status: 'ACCEPTED',
         },
       }),
