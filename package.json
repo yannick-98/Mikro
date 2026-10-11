@@ -23,7 +23,8 @@
     "test:social": "node backend/scripts/social-test.js",
     "social:sync": "node backend/scripts/social-sync.js",
     "test:tools": "node backend/scripts/tools-test.js",
-    "test": "npm run test:shopify && npm run test:social && npm run test:tools"
+    "test": "npm run test:shopify && npm run test:social && npm run test:tools",
+    "youtube:check": "node backend/scripts/youtube-check.js"
   },
   "dependencies": {
     "@fontsource/inter": "^5.1.0",
