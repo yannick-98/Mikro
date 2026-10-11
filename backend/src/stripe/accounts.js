@@ -91,10 +91,14 @@ const PENDIENTES = {
 
 export function explicarPendiente(account) {
   const req = account.requirements || {}
-  const lista = [...(req.currently_due || []), ...(req.past_due || [])]
+  // past_due es un subconjunto de currently_due, asi que juntarlos sin mas
+  // repetia cada frase dos veces. Lo vi en una prueba de verdad: "Falta tu
+  // direccion. Falta aceptar las condiciones. Falta tu direccion. Falta
+  // aceptar las condiciones."
+  const lista = [...new Set([...(req.currently_due || []), ...(req.past_due || [])])]
   if (!lista.length) return null
 
-  const traducidos = lista.map((c) => PENDIENTES[c]).filter(Boolean)
+  const traducidos = [...new Set(lista.map((c) => PENDIENTES[c]).filter(Boolean))]
   if (traducidos.length) return traducidos.join('. ')
   return 'Stripe necesita algún dato más para poder pagarte'
 }

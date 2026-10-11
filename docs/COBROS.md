@@ -107,3 +107,73 @@ diferencia entre una demo honesta y una promesa falsa.
 ```bash
 npm run test:stripe   # 24 pruebas, sin red: importes, firmas y estados
 ```
+
+---
+
+## El circuito, probado contra Stripe
+
+```bash
+npm run stripe:circuito
+```
+
+Recorre el camino entero en modo prueba y deja la base como estaba. **No se
+teclea ningún número de tarjeta**: usa `pm_card_visa`, el método de pago de
+prueba que publica Stripe.
+
+29 comprobaciones. Las que de verdad importan:
+
+| Comprobación | Por qué |
+|---|---|
+| el cobro **no lleva** `transfer_data` | Si lo llevara, el dinero saldría al creador en el acto y no habría garantía que ofrecer |
+| abrir el pago **no** marca la colaboración como pagada | Solo el webhook puede hacerlo |
+| un aviso repetido no cuenta dos veces | Stripe entrega al menos una vez |
+| el creador no tiene nada antes de aprobar | Es literalmente la promesa del producto |
+| la transferencia va atada al cobro (`source_transaction`) | Si no, saldría del saldo general de Mikro |
+| pagar dos veces no paga dos veces | Clave de idempotencia |
+| devolver dos veces no devuelve dos veces | Lo mismo |
+
+### Dos cosas que encontró
+
+**La comisión de Stripe se guardaba en euros enteros.** 3,40 € se convertía en
+3 €, y cuarenta céntimos por cobro descuadran las cuentas al cabo de mil
+cobros. Ahora se guarda en céntimos.
+
+**Y casi nunca se sabe en el momento del cobro.** Stripe tarda un instante en
+calcularla, así que al registrar el cobro el campo queda a `null` — no a cero,
+que significaría «no costó nada». Se rellena al pagar al creador, días
+después, cuando la cifra existe seguro.
+
+### Lo que el script no prueba, y por qué
+
+**La entrega del webhook desde Stripe.** No puede llamar a un `localhost`, así
+que el script recoge el evento y se lo entrega al servidor firmado. Eso valida
+nuestro código entero —firma, idempotencia, estados, importes—, pero no la
+red. Esa parte se verificó aparte contra producción: un POST con una firma
+inventada devuelve 400.
+
+**El formulario de alta del creador.** Stripe no deja aceptar sus condiciones
+en nombre de una cuenta Express; tiene que pulsarlas una persona. El script
+comprueba lo que es nuestro (que el enlace se genera, que los requisitos se
+traducen a algo legible, que mientras tanto no se puede cobrar) y deja el
+formulario para quien lo tenga que rellenar.
+
+### Si falla el paso 7
+
+```
+--  saltado: hace falta completar el perfil de plataforma en Stripe
+```
+
+Stripe pide revisar las responsabilidades de la plataforma antes de dejarte
+crear cuentas cuyos requisitos recoges tú:
+
+> https://dashboard.stripe.com/settings/connect/platform-profile
+
+Es la pantalla donde se declara quién responde de las devoluciones y los
+impagos. Hay que leerla, no solo pulsarla.
+
+### Un detalle de la comisión en las pruebas
+
+`pm_card_visa` es una tarjeta **estadounidense**, así que Stripe cobra la
+tarifa internacional (~3,2 %) y en el circuito salen ~8 € sobre 250. Con una
+tarjeta europea real son ~4 €, que es la cifra con la que están hechas las
+cuentas del plan.

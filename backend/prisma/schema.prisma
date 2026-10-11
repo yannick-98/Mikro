@@ -506,10 +506,15 @@ model Payment {
   provider  String   @default("SIMULATED") // STRIPE | SIMULATED
   // pi_... un cobro, tr_... una transferencia, re_... una devolucion.
   stripeId  String?
-  // Lo que Stripe cobra por el movimiento. Sale de nuestra comision, no del
-  // creador: la empresa paga el precio acordado y el creador recibe su 88%
-  // pase lo que pase.
-  stripeFee Int      @default(0)
+  // Lo que Stripe cobra por el movimiento, EN CENTIMOS. Sale de nuestra
+  // comision, no del creador: la empresa paga el precio acordado y el creador
+  // recibe su 88% pase lo que pase.
+  //
+  // En centimos y no en euros porque una comision de 3,40 EUR guardada como
+  // entero se convierte en 3, y cuarenta centimos por cobro descuadran las
+  // cuentas al cabo de mil cobros. Nulo cuando todavia no se sabe: Stripe
+  // tarda un instante en calcularla, y cero significaria "no costo nada".
+  stripeFeeCents Int?
   error     String?
   reference String?
   createdAt DateTime @default(now())

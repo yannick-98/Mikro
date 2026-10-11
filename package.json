@@ -25,7 +25,9 @@
     "test:tools": "node backend/scripts/tools-test.js",
     "test": "npm run test:shopify && npm run test:social && npm run test:tools && npm run test:stripe",
     "youtube:check": "node backend/scripts/youtube-check.js",
-    "test:stripe": "node backend/scripts/stripe-test.js"
+    "test:stripe": "node backend/scripts/stripe-test.js",
+    "stripe:probar": "node backend/scripts/stripe-probar-clave.js",
+    "stripe:circuito": "node --env-file=.env backend/scripts/circuito-stripe.mjs"
   },
   "dependencies": {
     "@fontsource/inter": "^5.1.0",

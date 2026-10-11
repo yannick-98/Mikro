@@ -16,7 +16,7 @@
  * encima el cumplimiento de PCI y la posibilidad de filtrar una tarjeta.
  */
 import { prisma } from '../lib/prisma.js'
-import { APP_URL, MONEDA, aCentimos, aEuros, stripe } from './config.js'
+import { APP_URL, MONEDA, aCentimos, stripe } from './config.js'
 
 /** Etiqueta que une en Stripe el cobro con su transferencia. */
 export const grupoDe = (dealId) => `deal_${dealId}`
@@ -35,6 +35,23 @@ async function asegurarCliente(brand) {
   })
   await prisma.brand.update({ where: { id: brand.id }, data: { stripeCustomerId: cliente.id } })
   return cliente.id
+}
+
+/**
+ * Como se configura el cobro.
+ *
+ * Aparte de abrirCobro porque es lo unico que de verdad hay que mirar con
+ * lupa: sin transfer_group no se puede reconciliar despues, y si aqui
+ * apareciera un transfer_data el dinero saldria hacia el creador en el mismo
+ * momento del cobro y no habria ninguna garantia que ofrecer. Separado, se
+ * puede comprobar en una prueba sin montar medio Stripe.
+ */
+export function datosDelCobro(deal, brand) {
+  return {
+    transfer_group: grupoDe(deal.id),
+    description: `Mikro · colaboración ${deal.id}`,
+    metadata: { mikroDealId: deal.id, mikroBrandId: brand.id, mikroCreatorId: deal.creatorId },
+  }
 }
 
 /**
@@ -67,11 +84,7 @@ export async function abrirCobro(deal, brand) {
         },
       },
     ],
-    payment_intent_data: {
-      transfer_group: grupo,
-      description: `Mikro · colaboración ${deal.id}`,
-      metadata: { mikroDealId: deal.id, mikroBrandId: brand.id, mikroCreatorId: deal.creatorId },
-    },
+    payment_intent_data: datosDelCobro(deal, brand),
     metadata: { mikroDealId: deal.id },
     success_url: `${APP_URL()}/empresa/colaboraciones?pago=ok&deal=${deal.id}`,
     cancel_url: `${APP_URL()}/empresa/colaboraciones?pago=cancelado&deal=${deal.id}`,
@@ -87,17 +100,27 @@ export async function abrirCobro(deal, brand) {
   return sesion.url
 }
 
-/** Lo que Stripe se ha llevado por un cobro, en euros. */
+/**
+ * Lo que Stripe se ha llevado por un cobro, en centimos.
+ *
+ * Devuelve null cuando todavia no se sabe. Stripe tarda un instante en
+ * calcular la comision, y devolver cero en ese hueco seria afirmar que el
+ * cobro no costo nada.
+ */
 async function comisionDeStripe(paymentIntentId) {
+  if (!paymentIntentId) return { feeCents: null, chargeId: null }
   try {
     const pi = await stripe().paymentIntents.retrieve(paymentIntentId, {
       expand: ['latest_charge.balance_transaction'],
     })
     const bt = pi.latest_charge?.balance_transaction
-    return { fee: bt ? aEuros(bt.fee) : 0, chargeId: pi.latest_charge?.id || null }
+    return {
+      feeCents: typeof bt?.fee === 'number' ? bt.fee : null,
+      chargeId: pi.latest_charge?.id || null,
+    }
   } catch {
     // Que no sepamos la comision no puede impedir registrar el cobro.
-    return { fee: 0, chargeId: null }
+    return { feeCents: null, chargeId: null }
   }
 }
 
@@ -116,7 +139,7 @@ export async function registrarCobro(dealId, paymentIntentId) {
   const deal = await prisma.deal.findUnique({ where: { id: dealId } })
   if (!deal) throw new Error('Esa colaboración no existe')
 
-  const { fee } = await comisionDeStripe(paymentIntentId)
+  const { feeCents } = await comisionDeStripe(paymentIntentId)
 
   const pago = await prisma.payment.create({
     data: {
@@ -127,7 +150,7 @@ export async function registrarCobro(dealId, paymentIntentId) {
       status: 'COMPLETED',
       provider: 'STRIPE',
       stripeId: paymentIntentId,
-      stripeFee: Math.round(fee),
+      stripeFeeCents: feeCents,
       reference: `ESC-${dealId.slice(-6).toUpperCase()}`,
     },
   })
@@ -147,6 +170,27 @@ export async function registrarCobro(dealId, paymentIntentId) {
 }
 
 /**
+ * Rellena la comision de Stripe de un cobro cuando ya se sabe.
+ *
+ * Al registrar el cobro suele no estar: Stripe tarda un instante en calcular
+ * la comision, y antes se guardaba un cero que parecia "no costo nada". Para
+ * cuando se le paga al creador ya han pasado dias y la cifra existe seguro,
+ * asi que ese es el momento de anotarla. Sin esto nunca sabriamos cual es
+ * nuestro margen real.
+ */
+export async function completarComision(dealId) {
+  const cobro = await prisma.payment.findFirst({
+    where: { dealId, kind: 'ESCROW_IN', provider: 'STRIPE', stripeFeeCents: null },
+  })
+  if (!cobro?.stripeId) return null
+
+  const { feeCents } = await comisionDeStripe(cobro.stripeId)
+  if (feeCents == null) return null
+
+  return prisma.payment.update({ where: { id: cobro.id }, data: { stripeFeeCents: feeCents } })
+}
+
+/**
  * Le manda al creador lo suyo.
  *
  * `source_transaction` ata la transferencia al cobro concreto que la
@@ -162,6 +206,10 @@ export async function transferirAlCreador(deal, creator) {
     where: { dealId: deal.id, kind: 'PAYOUT', status: 'COMPLETED' },
   })
   if (yaPagado) return { pago: yaPagado, repetido: true }
+
+  // Antes de pagar, se cierra la cuenta del cobro: ahora la comision de
+  // Stripe ya existe aunque no existiera al registrarlo.
+  await completarComision(deal.id)
 
   const neto = deal.fee - deal.feePlatform
   const { chargeId } = await comisionDeStripe(deal.stripePaymentIntent)
@@ -226,4 +274,12 @@ export async function devolver(deal, motivo = 'requested_by_customer') {
   return { pago, repetido: false }
 }
 
-export default { abrirCobro, registrarCobro, transferirAlCreador, devolver, grupoDe }
+export default {
+  abrirCobro,
+  registrarCobro,
+  transferirAlCreador,
+  devolver,
+  grupoDe,
+  datosDelCobro,
+  completarComision,
+}
