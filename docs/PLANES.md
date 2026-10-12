@@ -127,7 +127,14 @@ puede salir sería cobrarle de más por un problema de su banco.
 npm run planes:alta     # crea productos y precios en Stripe, y añade los
                         # eventos de suscripción al webhook. Idempotente.
 npm run test:planes     # 65 pruebas, sin red: es donde está el dinero
+npm run planes:circuito # 17 comprobaciones contra Stripe y contra producción
 ```
+
+El circuito es lo único que no se puede probar en local, porque Stripe no
+llama a un localhost. Contrata un plan con una tarjeta de prueba, deja que el
+aviso viaje por internet hasta el servidor desplegado, comprueba que la
+comisión de esa empresa ha bajado, cancela y comprueba que vuelve. Deja la
+base y Stripe como estaban.
 
 Hace falta una vez en pruebas y otra en real: son dos mundos separados con
 objetos distintos.

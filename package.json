@@ -33,7 +33,8 @@
     "test:paypal": "node backend/scripts/paypal-test.js",
     "paypal:pagar": "node --env-file=.env backend/scripts/paypal-pagar.mjs",
     "test:planes": "node backend/scripts/planes-test.js",
-    "planes:alta": "node --env-file=.env backend/scripts/planes-alta.mjs"
+    "planes:alta": "node --env-file=.env backend/scripts/planes-alta.mjs",
+    "planes:circuito": "node --env-file=.env backend/scripts/circuito-planes.mjs"
   },
   "dependencies": {
     "@fontsource/inter": "^5.1.0",
