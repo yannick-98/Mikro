@@ -14,7 +14,7 @@
 import { Router } from 'express'
 import express from 'express'
 import { prisma } from '../lib/prisma.js'
-import { stripe, stripeConfigured, webhookSecret } from '../stripe/config.js'
+import { stripe, stripeConfigured, webhookSecrets } from '../stripe/config.js'
 import { registrarCobro } from '../stripe/payments.js'
 import { refrescarCuenta } from '../stripe/accounts.js'
 import { notify } from '../services/notify.js'
@@ -28,22 +28,29 @@ router.use(express.raw({ type: '*/*', limit: '1mb' }))
  * Devuelve null cuando ya se ha respondido.
  */
 async function entrada(req, res) {
-  if (!stripeConfigured() || !webhookSecret()) {
+  const secretos = webhookSecrets()
+  if (!stripeConfigured() || !secretos.length) {
     // Sin configurar no se acepta nada: un endpoint que dice "ok" a
     // cualquiera es una invitacion a inventarse cobros.
     res.status(503).json({ error: 'Stripe no esta configurado' })
     return null
   }
 
-  let evento
-  try {
-    evento = stripe().webhooks.constructEvent(
-      req.body,
-      req.get('stripe-signature'),
-      webhookSecret(),
-    )
-  } catch (e) {
-    res.status(400).json({ error: `Firma no valida: ${e.message}` })
+  // Se prueba cada secreto porque hay dos endpoints: el de nuestra cuenta y
+  // el de las cuentas conectadas. Basta con que uno valide; si ninguno lo
+  // hace, la firma no es buena y se rechaza igual que antes.
+  let evento = null
+  let ultimoError = null
+  for (const secreto of secretos) {
+    try {
+      evento = stripe().webhooks.constructEvent(req.body, req.get('stripe-signature'), secreto)
+      break
+    } catch (e) {
+      ultimoError = e
+    }
+  }
+  if (!evento) {
+    res.status(400).json({ error: `Firma no valida: ${ultimoError?.message}` })
     return null
   }
 

@@ -133,6 +133,30 @@ check('sin secreto configurado -> 503', (await enviar(evento, firmar(evento))).s
 process.env.STRIPE_WEBHOOK_SECRET = SECRETO
 resetStripe()
 
+console.log('\n--- Dos endpoints, dos secretos ---')
+
+// Hacen falta dos endpoints: uno para los eventos de nuestra cuenta y otro
+// marcado como "connect" para los de las cuentas de los creadores. Stripe no
+// deja que uno solo reciba las dos cosas, y cada uno trae su propio secreto,
+// asi que la verificacion tiene que probar los dos.
+//
+// Esto salio probando contra produccion: sin el endpoint de connect,
+// account.updated no llegaba nunca y el alta de un creador se quedaba para
+// siempre en "le falta algo" aunque Stripe ya la hubiera aprobado.
+const SEGUNDO = 'whsec_elsegundoendpoint9876543210'
+process.env.STRIPE_WEBHOOK_SECRET = `${SECRETO},${SEGUNDO}`
+resetStripe()
+
+check('firmado con el primero se acepta', (await enviar(evento, firmar(evento, SECRETO))).status !== 400)
+check('firmado con el segundo se acepta', (await enviar(evento, firmar(evento, SEGUNDO))).status !== 400)
+check(
+  'firmado con uno que no esta en la lista -> 400',
+  (await enviar(evento, firmar(evento, 'whsec_tercerodesconocido'))).status === 400,
+)
+
+process.env.STRIPE_WEBHOOK_SECRET = SECRETO
+resetStripe()
+
 console.log('\n--- Configuracion ---')
 check('con clave, configurado', stripeConfigured() === true)
 delete process.env.STRIPE_SECRET_KEY

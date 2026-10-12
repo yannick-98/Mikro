@@ -73,7 +73,27 @@ export function resetStripe() {
   cliente = undefined
 }
 
-export const webhookSecret = () => process.env.STRIPE_WEBHOOK_SECRET || ''
+/**
+ * Los secretos de firma de los webhooks.
+ *
+ * En plural y no en singular porque hacen falta dos endpoints: uno para los
+ * eventos de nuestra cuenta (cobros, devoluciones) y otro marcado como
+ * "connect" para los de las cuentas de los creadores. Stripe no deja que un
+ * mismo endpoint reciba las dos cosas, y cada uno tiene su propio secreto.
+ *
+ * Esto se descubrio probando: sin el endpoint de connect, account.updated no
+ * llegaba nunca y el alta de un creador se quedaba para siempre en "le falta
+ * algo" aunque Stripe ya la hubiera aprobado.
+ *
+ * Se separan por comas en la misma variable, para no multiplicar ajustes.
+ */
+export const webhookSecrets = () =>
+  (process.env.STRIPE_WEBHOOK_SECRET || '')
+    .split(',')
+    .map((x) => x.trim())
+    .filter(Boolean)
+
+export const webhookSecret = () => webhookSecrets()[0] || ''
 
 // No hay clave publica. El pago ocurre en una pagina alojada por Stripe, asi
 // que el navegador nunca habla con Stripe desde nuestro codigo y no hay nada
