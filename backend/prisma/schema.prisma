@@ -68,6 +68,23 @@ model Brand {
 
   // Su cliente en Stripe, para no pedirle la tarjeta en cada colaboracion.
   stripeCustomerId String?
+
+  // Su plan. Lo unico que cambia un plan es la comision que paga por cada
+  // colaboracion; no hay funciones escondidas detras (ver billing/planes.js).
+  //
+  // planStatus es el de Stripe tal cual (active, past_due, canceled...) y no
+  // una traduccion nuestra: cuando algo no cuadra, lo que se mira es el panel
+  // de Stripe, y dos vocabularios distintos para lo mismo es como se acaba
+  // depurando a ciegas. past_due sigue contando como plan vivo: a quien se le
+  // ha caducado la tarjeta se le avisa, no se le sube la comision en mitad de
+  // una campana.
+  plan                 String    @default("FREE") // FREE | PRO | AGENCIA
+  planStatus           String?
+  stripeSubscriptionId String?
+  planRenewsAt         DateTime?
+  // Se ha dado de baja pero el periodo pagado no ha terminado. Hasta esa
+  // fecha sigue teniendo su comision: lo ha pagado.
+  planEndsAt           DateTime?
 }
 
 model Creator {
@@ -399,7 +416,32 @@ model Deal {
   creatorId   String
   creator     Creator  @relation(fields: [creatorId], references: [id], onDelete: Cascade)
   fee         Int
-  feePlatform Int      @default(0) // comision de Mikro
+  feePlatform Int      @default(0) // comision de Mikro, sobre el fijo
+
+  // El porcentaje con el que se calculo esa comision, congelado al crear la
+  // colaboracion. No es informativo: hace falta para la parte variable, que
+  // se cobra meses despues segun lo que venda el codigo del creador.
+  //
+  // Sin esto, una empresa que se suscribe en octubre veria recalculada a la
+  // baja la comision de las ventas de una campana cerrada en agosto, y una
+  // que se da de baja la veria subir. Las dos cosas son reescribir dinero ya
+  // pactado por dos partes.
+  platformPct Float @default(12)
+
+  // Lo que cobra el creador, en euros. Es el 88% del cache pactado y **no
+  // depende del plan de la empresa**: lo que compra un plan es que la empresa
+  // pague menos, no que el creador cobre menos. Su trato no puede cambiar
+  // porque otros dos hayan firmado algo.
+  creatorNet Int @default(0)
+
+  // Lo que se le cobra a la empresa, EN CENTIMOS: lo del creador mas la
+  // comision de Mikro. En centimos porque aqui aparecen los medios euros (el
+  // 9% de 250 son 22,50) y redondearlos a euros seria cobrarle cincuenta
+  // centimos de mas en cada colaboracion.
+  //
+  // Cero en las colaboraciones anteriores a los planes; para esas vale el
+  // cache, que es lo que se cobro (billing/planes.js, desgloseDe).
+  brandTotalCents Int @default(0)
 
   // Condiciones congeladas al aceptar la candidatura. La campana puede
   // cambiar despues, pero lo pactado con esta persona no: nadie puede ver
@@ -485,9 +527,9 @@ model Invoice {
   id     String @id @default(cuid())
   dealId String
   deal   Deal   @relation(fields: [dealId], references: [id], onDelete: Cascade)
-  kind   String // CREATOR_TO_BRAND | MIKRO_COMMISSION
+  kind   String // CREATOR_TO_BRAND | MIKRO_COMMISSION | MIKRO_PLAN_DISCOUNT
 
-  series String // "C2026" | "M2026"
+  series String // "C2026" facturas del creador | "M2026" de Mikro | "A2026" abonos
   number String // numero completo y correlativo: "C2026-0001"
 
   // Quien emite y quien recibe, congelados en el momento de emitir: si manana
@@ -515,13 +557,20 @@ model Invoice {
 }
 
 model Payment {
-  id     String @id @default(cuid())
-  dealId String
-  deal   Deal   @relation(fields: [dealId], references: [id], onDelete: Cascade)
-  amount Int
-  fee    Int
-  kind   String // ESCROW_IN | PAYOUT | REFUND
-  status String @default("COMPLETED") // PENDING | COMPLETED | FAILED
+  id          String @id @default(cuid())
+  dealId      String
+  deal        Deal   @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  amount      Int
+  // El mismo importe exacto, cuando `amount` en euros se queda corto. Pasa
+  // desde que hay planes: con el descuento de uno, la empresa puede pagar
+  // 242,50 y redondear eso a 242 o a 243 descuadra el libro.
+  //
+  // Nulo en las filas anteriores, donde `amount` era exacto porque todos los
+  // importes eran euros redondos.
+  amountCents Int?
+  fee         Int
+  kind        String // ESCROW_IN | PAYOUT | REFUND
+  status      String @default("COMPLETED") // PENDING | COMPLETED | FAILED
 
   // Hasta ahora estas filas eran la unica realidad: se escribia "ESCROW_IN"
   // y no se movia un euro. Ahora cada una apunta al objeto de Stripe que la

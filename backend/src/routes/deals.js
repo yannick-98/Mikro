@@ -8,6 +8,7 @@ import { recomputeCreator } from '../services/creatorStats.js'
 import { notify } from '../services/notify.js'
 import { emitirFacturas, publicInvoice } from '../services/invoice.js'
 import { repartoDeal } from '../services/pay.js'
+import { desgloseDe } from '../billing/planes.js'
 import { stripeConfigured } from '../stripe/config.js'
 import { abrirCobro, devolver, transferirAlCreador } from '../stripe/payments.js'
 import { paypalConfigured } from '../paypal/config.js'
@@ -34,7 +35,9 @@ function serializeDeal(deal, viewerRole) {
     status: deal.status,
     fee: deal.fee,
     feePlatform: deal.feePlatform,
-    netToCreator: deal.fee - deal.feePlatform,
+    netToCreator: desgloseDe(deal).creatorNet,
+    // Lo que paga la empresa, que con plan es menos que el cache.
+    brandPays: Math.round(desgloseDe(deal).brandCents) / 100,
     // El reparto separa lo seguro de lo que depende de las ventas. Nunca se
     // devuelve solo el total: juntarlos haria pasar una expectativa por un
     // sueldo.
@@ -46,7 +49,12 @@ function serializeDeal(deal, viewerRole) {
     campaign: publicCampaign(deal.campaign),
     brand: publicBrand(deal.brand),
     creator: publicCreator(deal.creator),
-    payments: deal.payments,
+    // Los importes salen de los centimos cuando los hay: desde que hay
+    // planes, lo que paga una empresa puede llevar medio euro.
+    payments: (deal.payments || []).map((p) => ({
+      ...p,
+      amount: p.amountCents != null ? p.amountCents / 100 : p.amount,
+    })),
     submissions: (deal.submissions || []).map((x) => ({
       id: x.id,
       version: x.version,
@@ -487,7 +495,8 @@ router.post(
       await prisma.payment.create({
         data: {
           dealId: deal.id,
-          amount: deal.fee,
+          amount: Math.round(desgloseDe(deal).brandCents / 100),
+          amountCents: desgloseDe(deal).brandCents,
           fee: deal.feePlatform,
           kind: 'ESCROW_IN',
           provider: 'SIMULATED',
@@ -513,7 +522,7 @@ router.post(
         await prisma.payment.create({
           data: {
             dealId: deal.id,
-            amount: deal.fee - deal.feePlatform,
+            amount: desgloseDe(deal).creatorNet,
             fee: deal.feePlatform,
             kind: 'PAYOUT',
             provider: 'SIMULATED',
@@ -533,7 +542,8 @@ router.post(
           await prisma.payment.create({
             data: {
               dealId: deal.id,
-              amount: deal.fee,
+              amount: Math.round(desgloseDe(deal).brandCents / 100),
+              amountCents: desgloseDe(deal).brandCents,
               fee: 0,
               kind: 'REFUND',
               provider: 'SIMULATED',

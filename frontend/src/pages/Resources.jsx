@@ -55,7 +55,7 @@ const FAQ = [
   },
   {
     q: 'Cuanto cuesta usarlo?',
-    a: 'Registrarse y publicar campanas es gratis. Mikro cobra una comision del 12% sobre cada colaboracion cerrada. Hay planes de suscripcion opcionales que reducen esa comision.',
+    a: 'Registrarse y publicar campanas es gratis. Mikro cobra una comision del 12% sobre cada colaboracion cerrada. Hay dos planes opcionales que la bajan: Pro (29 EUR/mes, 9%) y Agencia (99 EUR/mes, 6%). Lo unico que cambian es la comision, y el creador cobra lo mismo en los tres: lo que baja es lo que pagas tu.',
   },
   {
     q: 'Como se garantiza el pago?',

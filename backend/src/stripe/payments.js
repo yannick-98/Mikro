@@ -17,6 +17,7 @@
  */
 import { prisma } from '../lib/prisma.js'
 import { APP_URL, MONEDA, aCentimos, stripe } from './config.js'
+import { desgloseDe } from '../billing/planes.js'
 
 /** Etiqueta que une en Stripe el cobro con su transferencia. */
 export const grupoDe = (dealId) => `deal_${dealId}`
@@ -76,7 +77,10 @@ export async function abrirCobro(deal, brand) {
         quantity: 1,
         price_data: {
           currency: MONEDA,
-          unit_amount: aCentimos(deal.fee),
+          // Lo que paga la empresa, que con un plan contratado es menos que
+          // el cache pactado: el creador cobra igual y la diferencia sale de
+          // la comision de Mikro (billing/planes.js).
+          unit_amount: desgloseDe(deal).brandCents,
           product_data: {
             name: `Colaboración · ${deal.campaign?.title || 'Mikro'}`,
             description: `${deal.creator?.displayName || 'Creador'} — el importe queda cobrado y no se le envía hasta que apruebes el contenido`,
@@ -144,7 +148,8 @@ export async function registrarCobro(dealId, paymentIntentId) {
   const pago = await prisma.payment.create({
     data: {
       dealId,
-      amount: deal.fee,
+      amount: Math.round(desgloseDe(deal).brandCents / 100),
+      amountCents: desgloseDe(deal).brandCents,
       fee: deal.feePlatform,
       kind: 'ESCROW_IN',
       status: 'COMPLETED',
@@ -211,7 +216,8 @@ export async function transferirAlCreador(deal, creator) {
   // Stripe ya existe aunque no existiera al registrarlo.
   await completarComision(deal.id)
 
-  const neto = deal.fee - deal.feePlatform
+  // Lo del creador, que no depende del plan de la empresa.
+  const neto = desgloseDe(deal).creatorNet
   const { chargeId } = await comisionDeStripe(deal.stripePaymentIntent)
 
   const transferencia = await stripe().transfers.create(
@@ -261,7 +267,8 @@ export async function devolver(deal, motivo = 'requested_by_customer') {
   const pago = await prisma.payment.create({
     data: {
       dealId: deal.id,
-      amount: deal.fee,
+      amount: Math.round(desgloseDe(deal).brandCents / 100),
+      amountCents: desgloseDe(deal).brandCents,
       fee: 0,
       kind: 'REFUND',
       status: 'COMPLETED',

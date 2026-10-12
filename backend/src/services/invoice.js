@@ -13,6 +13,15 @@
  *    7% durante los tres primeros anios de actividad).
  *  - MIKRO_COMMISSION: Mikro factura su comision al creador. IVA del 21% y
  *    sin retencion, porque la emite una empresa.
+ *  - MIKRO_PLAN_DISCOUNT: solo si la empresa tiene plan. Es un abono de Mikro
+ *    a la empresa por los puntos de comision que le descuenta su plan.
+ *
+ * El tercero merece una explicacion, porque es el que parece raro. Un plan no
+ * cambia el trato del creador: el factura su cache entero y paga su 12%, como
+ * siempre. Lo que compra la empresa es que Mikro le devuelva unos puntos, y
+ * eso es un abono de Mikro a la empresa, no una factura distinta del creador.
+ * Contarlo de cualquier otra forma deja las facturas sin cuadrar con el
+ * dinero que se mueve de verdad.
  *
  * Todo en centimos y con enteros. El resto del modelo usa euros redondos
  * porque las tarifas lo son, pero el 21% de 250 son 52,50 y una factura que
@@ -24,6 +33,7 @@
  * algo mas, y conviene decirlo en la propia pantalla.
  */
 import { prisma } from '../lib/prisma.js'
+import { desgloseDe, planPorId } from '../billing/planes.js'
 
 export const IVA = 21
 
@@ -123,6 +133,34 @@ export async function emitirFacturas(dealId) {
           clientTaxId: deal.creator.taxId || null,
           clientAddress: deal.creator.billingAddress || null,
           concept: `Comisión de intermediación — ${deal.campaign.title}`,
+          ...lineas,
+        },
+      }),
+    )
+  }
+
+  // --- Abono de Mikro a la empresa por su plan ----------------------------
+  //
+  // En negativo, que es lo que es: dinero que Mikro le devuelve. Va en su
+  // propia serie (A) porque un abono no puede llevar numero de la serie de
+  // facturas emitidas; mezclarlos rompe la correlatividad que exige Hacienda.
+  const { descuentoCents } = desgloseDe(deal)
+  if (descuentoCents > 0 && !deal.invoices.some((i) => i.kind === 'MIKRO_PLAN_DISCOUNT')) {
+    const lineas = calcular({ baseCents: -descuentoCents })
+    emitidas.push(
+      await prisma.invoice.create({
+        data: {
+          dealId: deal.id,
+          kind: 'MIKRO_PLAN_DISCOUNT',
+          series: `A${anio}`,
+          number: await siguienteNumero(`A${anio}`),
+          issuerName: process.env.MIKRO_LEGAL_NAME || 'Mikro',
+          issuerTaxId: process.env.MIKRO_TAX_ID || null,
+          issuerAddress: process.env.MIKRO_ADDRESS || null,
+          clientName: deal.brand.companyName,
+          clientTaxId: deal.brand.vatNumber || null,
+          clientAddress: deal.brand.billingAddress || null,
+          concept: `Descuento del plan ${planPorId(deal.brand.plan).nombre} — ${deal.campaign.title}`,
           ...lineas,
         },
       }),

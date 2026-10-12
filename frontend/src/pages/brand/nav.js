@@ -1,4 +1,4 @@
-import { Bookmark, Building2, Handshake, LayoutDashboard, Megaphone } from 'lucide-react'
+import { Bookmark, Building2, CreditCard, Handshake, LayoutDashboard, Megaphone } from 'lucide-react'
 
 export const BRAND_NAV = [
   { to: '/empresa', label: 'Resumen', icon: LayoutDashboard, end: true },
@@ -6,6 +6,7 @@ export const BRAND_NAV = [
   { to: '/empresa/colaboraciones', label: 'Colaboraciones', icon: Handshake },
   { to: '/empresa/guardados', label: 'Guardados', icon: Bookmark },
   { to: '/empresa/perfil', label: 'Mi empresa', icon: Building2 },
+  { to: '/empresa/plan', label: 'Mi plan', icon: CreditCard },
 ]
 
 export default BRAND_NAV

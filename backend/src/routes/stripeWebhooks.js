@@ -17,6 +17,8 @@ import { prisma } from '../lib/prisma.js'
 import { stripe, stripeConfigured, webhookSecrets } from '../stripe/config.js'
 import { registrarCobro } from '../stripe/payments.js'
 import { refrescarCuenta } from '../stripe/accounts.js'
+import { aplicarSuscripcion } from '../billing/suscripciones.js'
+import { planPorId } from '../billing/planes.js'
 import { notify } from '../services/notify.js'
 
 const router = Router()
@@ -138,6 +140,51 @@ router.post('/', async (req, res) => {
             link: '/creador/perfil',
           })
         }
+        break
+      }
+
+      // El plan de una empresa. Es el unico sitio donde cambia: fiarse de
+      // que el navegador vuelva a la pagina de exito seria dar plan Agencia
+      // a quien escriba esa URL a mano.
+      case 'customer.subscription.created':
+      case 'customer.subscription.updated':
+      case 'customer.subscription.deleted': {
+        const brand = await aplicarSuscripcion(evento.data.object)
+        if (!brand) break
+
+        // Solo se avisa cuando empieza a valer, no en cada cambio: Stripe
+        // manda un subscription.updated por cualquier cosa, y un aviso por
+        // cada uno es ruido que acaba en "silenciar notificaciones".
+        const antes = evento.data.previous_attributes?.status
+        if (antes && antes !== 'active' && evento.data.object.status === 'active') {
+          await notify(brand.userId, {
+            kind: 'SYSTEM',
+            title: `Ya tienes el plan ${planPorId(brand.plan).nombre}`,
+            body: `A partir de ahora pagas un ${planPorId(brand.plan).comision}% de comisión en cada colaboración que cierres.`,
+            link: '/empresa/plan',
+          })
+        }
+        break
+      }
+
+      // La tarjeta de una empresa con plan ha fallado. No se le toca el plan:
+      // Stripe reintenta el cobro varios dias antes de cancelar, y subirle la
+      // comision en mitad de una campana por un cobro que todavia puede salir
+      // seria cobrarle de mas por un problema de su banco.
+      case 'invoice.payment_failed': {
+        const factura = evento.data.object
+        if (!factura.subscription) break
+        const brand = await prisma.brand.findFirst({
+          where: { stripeSubscriptionId: factura.subscription },
+          select: { userId: true },
+        })
+        if (!brand) break
+        await notify(brand.userId, {
+          kind: 'SYSTEM',
+          title: 'No hemos podido cobrar tu plan',
+          body: 'Revisa la tarjeta. Tu plan sigue activo mientras lo arreglas; si no se cobra, vuelves al 12% de comisión.',
+          link: '/empresa/plan',
+        })
         break
       }
 

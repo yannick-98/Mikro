@@ -22,6 +22,7 @@ import CampaignReport from './pages/brand/CampaignReport'
 import BrandDeals from './pages/brand/Deals'
 import BrandSaved from './pages/brand/Saved'
 import BrandProfile from './pages/brand/Profile'
+import BrandPlan from './pages/brand/Plan'
 
 import CreatorDashboard from './pages/creator/Dashboard'
 import Opportunities from './pages/creator/Opportunities'
@@ -113,6 +114,7 @@ export default function App() {
         <Route path="/empresa/colaboraciones" element={<Protected roles={['BRAND']}><BrandDeals /></Protected>} />
         <Route path="/empresa/guardados" element={<Protected roles={['BRAND']}><BrandSaved /></Protected>} />
         <Route path="/empresa/perfil" element={<Protected roles={['BRAND']}><BrandProfile /></Protected>} />
+        <Route path="/empresa/plan" element={<Protected roles={['BRAND']}><BrandPlan /></Protected>} />
 
         {/* Creador */}
         <Route path="/creador" element={<Protected roles={['CREATOR']}><CreatorDashboard /></Protected>} />

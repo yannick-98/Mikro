@@ -22,6 +22,8 @@
  * que decide a quien se paga.
  */
 
+import { desgloseDe } from '../billing/planes.js'
+
 export const MODELOS = ['FIXED', 'FIXED_VARIABLE', 'VARIABLE']
 
 export const MODELO_ETIQUETA = {
@@ -33,8 +35,19 @@ export const MODELO_ETIQUETA = {
 export const llevaVariable = (payModel) => payModel === 'FIXED_VARIABLE' || payModel === 'VARIABLE'
 export const llevaFijo = (payModel) => payModel !== 'VARIABLE'
 
-const feePct = () => Number(process.env.PLATFORM_FEE_PCT || 12)
 const redondea = (n) => Math.round(n * 100) / 100
+
+/**
+ * La comision que paga el creador, en porcentaje.
+ *
+ * Es siempre la base, **no la del plan de la empresa**. El plan de la empresa
+ * no cambia el trato del creador: lo que compra es un descuento sobre lo que
+ * paga ella, y ese descuento sale de la comision de Mikro
+ * (billing/planes.js). Si esto leyera el porcentaje del plan, un creador
+ * veria cambiar lo que cobra segun lo que su cliente hubiera contratado por
+ * su cuenta, que es exactamente lo que no puede pasar.
+ */
+const feePct = () => Number(process.env.PLATFORM_FEE_PCT || 12)
 
 /**
  * Reparto de una colaboracion.
@@ -81,6 +94,13 @@ export function repartoDeal(deal, atribuciones = []) {
     // Lo unico garantizado de antemano. Va aparte a proposito.
     garantizado: fijo - fijoComision,
     pendienteDeVentas: llevaVariable(deal.payModel),
+
+    // Lo que paga la empresa por el fijo, que con plan es menos que el cache:
+    // la diferencia es el descuento del plan y sale de Mikro, no del creador.
+    // Va aparte de `fijo` porque son dos cifras distintas y confundirlas es
+    // ensenarle a cada uno el numero del otro.
+    empresaPaga: redondea(desgloseDe(deal).brandCents / 100),
+    descuentoPlan: redondea(desgloseDe(deal).descuentoCents / 100),
   }
 }
 

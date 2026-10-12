@@ -46,6 +46,11 @@ const ENDPOINTS = [
       'payment_intent.payment_failed',
       'transfer.reversed',
       'transfer.canceled',
+      // Los planes. Es el unico sitio donde una empresa cambia de plan.
+      'customer.subscription.created',
+      'customer.subscription.updated',
+      'customer.subscription.deleted',
+      'invoice.payment_failed',
     ],
   },
   { nombre: 'de cuentas conectadas', connect: true, eventos: ['account.updated'] },

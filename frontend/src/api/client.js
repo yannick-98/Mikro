@@ -84,6 +84,11 @@ export const api = {
   creatorDashboard: () => request('/creator/dashboard'),
 
   // Empresa
+  // Planes de suscripcion de la empresa.
+  planes: () => request('/billing/planes'),
+  suscribir: (plan) => request('/billing/suscribir', { method: 'POST', body: { plan } }),
+  portalPlan: () => request('/billing/portal', { method: 'POST' }),
+
   myBrand: () => request('/brands/me'),
   updateBrand: (payload) => request('/brands/me', { method: 'PATCH', body: payload }),
   brandDashboard: () => request('/brands/me/dashboard'),

@@ -19,6 +19,7 @@ import toolRoutes from './routes/tools.js'
 import shopifyRoutes from './routes/shopify.js'
 import shopifyWebhookRoutes from './routes/shopifyWebhooks.js'
 import stripeRoutes from './routes/stripe.js'
+import billingRoutes from './routes/billing.js'
 import stripeWebhookRoutes from './routes/stripeWebhooks.js'
 import miscRoutes from './routes/misc.js'
 
@@ -69,6 +70,7 @@ export function createApp() {
   app.use('/api/demo-requests', router(demoRoutes))
   app.use('/api/social', router(socialRoutes))
   app.use('/api/stripe', router(stripeRoutes))
+  app.use('/api/billing', router(billingRoutes))
   // Herramientas: precio de referencia, informe, brief y media kit. Montadas
   // en la raiz porque cada una cuelga de donde le corresponde por recurso.
   app.use('/api', router(toolRoutes))

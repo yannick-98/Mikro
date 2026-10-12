@@ -227,6 +227,14 @@ dar por fallido algo que solo iba con retraso.
 
 ---
 
+## Los planes
+
+La suscripcion de una empresa baja su comision, y eso toca el reparto de cada
+colaboracion: tres cantidades donde antes habia dos, y una factura de abono
+mas. Esta en [PLANES.md](PLANES.md).
+
+---
+
 ## PayPal
 
 Dos cosas distintas con el mismo nombre, y conviene no mezclarlas: **pagar con

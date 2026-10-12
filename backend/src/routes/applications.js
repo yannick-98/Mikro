@@ -5,6 +5,7 @@ import { asyncHandler, badRequest, forbidden, notFound, parseBody } from '../lib
 import { requireAuth, requireRole } from '../middleware/auth.js'
 import { publicCampaign, publicCreator } from '../services/serialize.js'
 import { notify } from '../services/notify.js'
+import { comisionDe, importesDe } from '../billing/planes.js'
 
 const router = Router()
 
@@ -120,8 +121,11 @@ router.post(
     if (application.campaign.brandId !== req.user.brand.id) throw forbidden()
     if (application.status === 'ACCEPTED') throw badRequest('Esta candidatura ya esta aceptada')
 
-    const feePct = Number(process.env.PLATFORM_FEE_PCT || 12)
+    // La comision es la del plan que la empresa tenga HOY, y se congela en
+    // el trato: lo pactado no se recalcula si manana cambia de plan.
+    const feePct = comisionDe(await prisma.brand.findUnique({ where: { id: req.user.brand.id } }))
     const fee = req.body?.fee ? Number(req.body.fee) : application.proposedFee
+    const importes = importesDe(fee, feePct)
 
     const [, deal] = await prisma.$transaction([
       prisma.application.update({ where: { id: application.id }, data: { status: 'ACCEPTED' } }),
@@ -131,7 +135,13 @@ router.post(
           brandId: req.user.brand.id,
           creatorId: application.creatorId,
           fee,
-          feePlatform: Math.round((fee * feePct) / 100),
+          // La comision del creador es siempre la base: su trato no cambia
+          // porque la empresa tenga plan. Lo que el plan mueve es lo que paga
+          // la empresa, y eso vive en brandTotalCents.
+          feePlatform: importes.comisionCreador,
+          platformPct: feePct,
+          creatorNet: importes.creatorNet,
+          brandTotalCents: importes.brandCents,
           // Congeladas aqui: la campana puede cambiar manana, pero el trato
           // cerrado con esta persona no.
           payModel: application.campaign.payModel,
@@ -190,8 +200,10 @@ router.post(
     if (application.creatorId !== req.user.creator.id) throw forbidden()
     if (application.source !== 'BRAND') throw badRequest('Esta candidatura la has creado tu')
 
-    const feePct = Number(process.env.PLATFORM_FEE_PCT || 12)
+    // El plan es el de la empresa que invita, no el de quien acepta.
+    const feePct = comisionDe(application.campaign.brand)
     const fee = application.proposedFee
+    const importes = importesDe(fee, feePct)
 
     const [, deal] = await prisma.$transaction([
       prisma.application.update({ where: { id: application.id }, data: { status: 'ACCEPTED' } }),
@@ -201,7 +213,13 @@ router.post(
           brandId: application.campaign.brandId,
           creatorId: application.creatorId,
           fee,
-          feePlatform: Math.round((fee * feePct) / 100),
+          // La comision del creador es siempre la base: su trato no cambia
+          // porque la empresa tenga plan. Lo que el plan mueve es lo que paga
+          // la empresa, y eso vive en brandTotalCents.
+          feePlatform: importes.comisionCreador,
+          platformPct: feePct,
+          creatorNet: importes.creatorNet,
+          brandTotalCents: importes.brandCents,
           // Congeladas aqui: la campana puede cambiar manana, pero el trato
           // cerrado con esta persona no.
           payModel: application.campaign.payModel,

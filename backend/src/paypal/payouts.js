@@ -20,6 +20,7 @@
 import crypto from 'node:crypto'
 import { prisma } from '../lib/prisma.js'
 import { notify } from '../services/notify.js'
+import { desgloseDe } from '../billing/planes.js'
 import { MONEDA, aCentimos, aImporte } from './config.js'
 import { esRepetido, paypal } from './client.js'
 
@@ -72,7 +73,7 @@ export async function encolarPago(deal, creator) {
   const pago = await prisma.payment.create({
     data: {
       dealId: deal.id,
-      amount: deal.fee - deal.feePlatform,
+      amount: desgloseDe(deal).creatorNet,
       fee: deal.feePlatform,
       kind: 'PAYOUT',
       status: 'PENDING',
