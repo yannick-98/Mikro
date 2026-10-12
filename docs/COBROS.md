@@ -224,3 +224,95 @@ Es lo único que no se puede probar en local, porque Stripe no llama a un
 Un detalle: el contador `pending_webhooks` de Stripe tarda unos segundos en
 bajar a cero aunque la entrega ya haya ocurrido. La prueba espera, en vez de
 dar por fallido algo que solo iba con retraso.
+
+---
+
+## PayPal
+
+Dos cosas distintas con el mismo nombre, y conviene no mezclarlas: **pagar con
+PayPal** y **cobrar en PayPal**.
+
+### Que la empresa pague con PayPal
+
+Va por Stripe. No es una integración aparte: se activa PayPal en los métodos de
+pago de Stripe y aparece como un botón más en la página de pago. Cero código.
+
+| Dónde | Estado |
+|---|---|
+| El plan (suscripción) | Funciona. Es un cargo normal de nuestra cuenta |
+| Una colaboración | Necesita que Stripe lo apruebe |
+
+El motivo del segundo es que un cobro de colaboración lleva los datos de
+Connect (`transfer_group`), y Stripe responde:
+
+> *Your Stripe account currently does not support Connect payments with PayPal.*
+
+Mikro encaja en el caso que Stripe aprueba: su documentación dice que PayPal
+está disponible para marketplaces que cobran al cliente y luego pagan a
+terceros (pone Deliveroo y ManoMano de ejemplo), y que cargos y transferencias
+separados —nuestro montaje— está aceptado. No está disponible para plataformas
+que dan de alta a otros negocios para que cobren ellos, tipo Shopify.
+
+**Hay que solicitarlo:** Stripe → Configuración → Métodos de pago → PayPal →
+*onboarding request*. Cuando lo aprueben aparece solo, sin tocar nada.
+
+Al configurarlo, la **preferencia de liquidación tiene que ser Stripe, no
+PayPal**. Si el dinero se liquida en PayPal no entra en el saldo de Stripe, y
+las transferencias a los creadores salen de ese saldo: la garantía entera se
+quedaría sin fondos con los que cumplirse.
+
+### Que el creador cobre en su PayPal
+
+Esto sí es una integración aparte, y tiene una consecuencia que no se puede
+disimular.
+
+El dinero cobrado vive en el **saldo de Stripe**. Un pago de PayPal sale del
+**saldo de PayPal**, que es otro sitio y no se llena solo: hay que mover el
+dinero de Stripe al banco y del banco a PayPal. Es una operación de tesorería,
+la hace una persona, y no hay API que la haga.
+
+Por eso, cuando se aprueba el contenido de un creador que cobra por PayPal, el
+pago **se encola**:
+
+```
+aprobar  ->  Payment PENDING        (no sale nada)
+             npm run paypal:pagar   (lista lo que saldría)
+             ... -- --enviar        (lo manda, con el saldo que haya)
+             ... -- --cerrar        (pregunta si ha llegado)
+```
+
+Un pago enviado no es un pago cobrado, y por eso hay un tercer paso: entre
+enviarlo y que llegue, PayPal puede rechazarlo, devolverlo o dejarlo sin
+reclamar. `UNCLAIMED` es el caso que engaña: significa que ese correo no tiene
+cuenta de PayPal, PayPal ya ha avisado al creador y le da 30 días. No es un
+fallo todavía, así que se queda pendiente.
+
+La interfaz le dice al creador lo que es verdad: por el banco es inmediato, por
+PayPal tarda unos días.
+
+**Lo que cuesta.** PayPal cobra al que envía, alrededor del 2% con tope. Sobre
+un pago de 220 € son unos 4,40 €, y salen de la comisión de Mikro igual que la
+de Stripe. Con el reparto de hoy el margen de una colaboración de 250 € pasa de
+unos 26 € a unos 21. Es una decisión de negocio y está escrita aquí para que se
+tome sabiéndola.
+
+**Lo que falta para usarlo:**
+
+1. Cuenta **business** de PayPal y pedir acceso a **Payouts** (no está abierto
+   a todas las cuentas; hay que solicitarlo y lo aprueban a mano).
+2. Credenciales en el `.env` y en Netlify:
+
+```
+PAYPAL_CLIENT_ID=...
+PAYPAL_CLIENT_SECRET=...
+PAYPAL_MODE=sandbox        # live cuando toque. Por defecto, sandbox
+```
+
+3. Saldo en la cuenta de PayPal antes de lanzar un envío.
+
+```bash
+npm run test:paypal   # 39 pruebas, sin red
+```
+
+Sin credenciales no pasa nada: la opción de PayPal no aparece en el perfil del
+creador y todo el mundo cobra por el banco, como hasta ahora.

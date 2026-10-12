@@ -211,6 +211,10 @@ const updateCreatorSchema = z.object({
   // 15% es lo habitual; 7% los tres primeros anios de actividad; 0 si no
   // procede. Lo elige el creador porque solo el sabe en que caso esta.
   irpfRate: z.number().int().min(0).max(21).optional(),
+  // Por donde cobra. El correo se valida como correo porque aqui un dedazo no
+  // es un campo mal puesto: es dinero que sale hacia la cuenta de otro.
+  payoutMethod: z.enum(['STRIPE', 'PAYPAL']).optional(),
+  paypalEmail: z.string().trim().email().max(120).optional().or(z.literal('')),
   ratePost: z.number().min(0).optional(),
   rateReel: z.number().min(0).optional(),
   rateStory: z.number().min(0).optional(),

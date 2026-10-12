@@ -35,6 +35,30 @@ async function main() {
   const health = await call('/health')
   check('health responde', health.json.ok === true)
 
+  // Este circuito recorre el camino simulado: fondea, aprueba y libera el
+  // pago sin pasarela. Si la API tiene Stripe configurado, la ruta de fondeo
+  // exige que el creador tenga su alta de cobros verificada —y el creador de
+  // prueba no la tiene— asi que fallan once comprobaciones seguidas por un
+  // motivo que no tiene nada que ver con lo que se esta probando.
+  //
+  // Vale la pena pararlo aqui y decirlo: once FALLO sin explicacion mandan a
+  // buscar un error que no existe.
+  const pasarela = await call('/stripe/estado')
+  if (pasarela.json?.configurado) {
+    console.log(`
+  La API tiene Stripe configurado y esta prueba recorre el modo simulado.
+
+  Lanza la API sin la clave y vuelve a intentarlo:
+
+      STRIPE_SECRET_KEY= npm run dev
+
+  Para probar el circuito de cobros de verdad, que es otra cosa:
+
+      npm run stripe:circuito
+`)
+    process.exit(1)
+  }
+
   const list = await call('/creators?pageSize=6')
   check('listado de creadores', list.json.items?.length === 6, `total=${list.json.total}`)
   check('ranking en orden', list.json.items?.[0]?.rankPosition === 1)

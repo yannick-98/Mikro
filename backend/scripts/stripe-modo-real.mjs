@@ -181,6 +181,30 @@ try {
   fallo(`Connect no esta activo en modo real: ${e.message}`)
 }
 
+// PayPal como metodo de pago. Se enciende aqui y no a mano porque en modo
+// real es otra configuracion distinta de la de pruebas, y es justo el tipo de
+// ajuste que se queda sin hacer.
+//
+// Encenderlo no basta para los cobros de colaboraciones: esos llevan datos de
+// Connect, y PayPal junto a Connect lo tiene que aprobar Stripe a mano. Para
+// las suscripciones si vale desde el primer momento.
+if (!soloMirar) {
+  try {
+    const cfg = (await s.paymentMethodConfigurations.list({ limit: 5 })).data.find(
+      (c) => c.is_default,
+    )
+    if (cfg) {
+      const r = await s.paymentMethodConfigurations.update(cfg.id, {
+        paypal: { display_preference: { preference: 'on' } },
+      })
+      if (r.paypal?.display_preference?.value === 'on') ok('PayPal activado como metodo de pago')
+      else aviso('PayPal no se ha podido activar; hazlo desde Ajustes -> Metodos de pago')
+    }
+  } catch (e) {
+    aviso(`PayPal no se ha podido activar: ${e.message}`)
+  }
+}
+
 // ---------------------------------------------------------------------------
 console.log('\n3. Los dos endpoints de webhook')
 

@@ -1,7 +1,15 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import clsx from 'clsx'
-import { AlertTriangle, ArrowUpRight, Banknote, Check, RefreshCw, ShieldCheck } from 'lucide-react'
+import {
+  AlertTriangle,
+  ArrowUpRight,
+  Banknote,
+  Check,
+  RefreshCw,
+  ShieldCheck,
+  Wallet,
+} from 'lucide-react'
 import { api } from '../api/client'
 import { Spinner } from './ui'
 
@@ -18,18 +26,79 @@ import { Spinner } from './ui'
  * guarda el DNI ni el IBAN de nadie, y eso se dice aquí porque es la
  * primera pregunta que se hace cualquiera al ver que le piden documentos.
  */
+/** Una de las dos vías por las que puede llegarle el dinero. */
+function Via({ activa, onClick, icono, titulo, detalle }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={clsx(
+        'rounded-xl border p-3 text-left transition',
+        activa
+          ? 'border-brand-600 bg-brand-50/60 ring-1 ring-brand-600/20'
+          : 'border-black/[0.08] hover:bg-black/[0.02]',
+      )}
+    >
+      <span className="flex items-center gap-2 text-[13.5px] font-extrabold">
+        <span className={activa ? 'text-brand-600' : 'text-ink/35'}>{icono}</span>
+        {titulo}
+        {activa ? <Check size={13} className="ml-auto text-brand-600" /> : null}
+      </span>
+      <span className="mt-1 block text-[12px] leading-relaxed text-ink/50">{detalle}</span>
+    </button>
+  )
+}
+
 export default function CobrosCreador({ show }) {
   const [estado, setEstado] = useState(null)
   const [ocupado, setOcupado] = useState(false)
+  const [via, setVia] = useState('STRIPE')
+  const [correo, setCorreo] = useState('')
   const [params, setParams] = useSearchParams()
 
   const cargar = useCallback(async () => {
     try {
-      setEstado(await api.miCuentaCobros())
+      const r = await api.miCuentaCobros()
+      setEstado(r)
+      setVia(r.paypal?.elegido ? 'PAYPAL' : 'STRIPE')
+      setCorreo(r.paypal?.email || '')
     } catch (e) {
       show?.error(e.message)
     }
   }, [show])
+
+  /**
+   * Cambiar de vía se guarda al momento, sin botón de confirmar.
+   *
+   * Es una decisión reversible y de una sola pulsación; pedir además un
+   * "guardar" es como se acaba con alguien que cree que ha elegido PayPal y
+   * sigue cobrando por el banco.
+   */
+  const cambiarVia = async (nueva) => {
+    if (nueva === via) return
+    const anterior = via
+    setVia(nueva)
+    try {
+      await api.updateCreator({ payoutMethod: nueva })
+      await cargar()
+    } catch (e) {
+      setVia(anterior)
+      show?.error(e.message)
+    }
+  }
+
+  const guardarCorreo = async () => {
+    setOcupado(true)
+    try {
+      await api.updateCreator({ paypalEmail: correo.trim(), payoutMethod: 'PAYPAL' })
+      show?.success('Guardado. Tus pagos irán a ese PayPal.')
+      await cargar()
+    } catch (e) {
+      show?.error(e.message)
+    } finally {
+      setOcupado(false)
+    }
+  }
 
   useEffect(() => {
     cargar()
@@ -99,7 +168,8 @@ export default function CobrosCreador({ show }) {
     )
   }
 
-  const lista = estado.puedeCobrar
+  const porPaypal = via === 'PAYPAL'
+  const lista = porPaypal ? !!estado.paypal?.email : estado.puedeCobrar
 
   return (
     <section className="card p-6">
@@ -109,8 +179,9 @@ export default function CobrosCreador({ show }) {
             <Banknote size={16} className="text-ink/35" /> Dónde cobras
           </h2>
           <p className="mt-1 max-w-xl text-[13.5px] leading-relaxed text-ink/55">
-            El dinero de tus colaboraciones va a tu cuenta bancaria a través de Stripe. Hasta que
-            esto esté verificado, las empresas no pueden pagarte.
+            {porPaypal
+              ? 'El dinero de tus colaboraciones va a tu cuenta de PayPal. Hasta que nos digas cuál, las empresas no pueden pagarte.'
+              : 'El dinero de tus colaboraciones va a tu cuenta bancaria a través de Stripe. Hasta que esto esté verificado, las empresas no pueden pagarte.'}
           </p>
         </div>
         {lista ? (
@@ -120,7 +191,74 @@ export default function CobrosCreador({ show }) {
         ) : null}
       </div>
 
-      {lista ? (
+      {/* Elegir via solo tiene sentido si hay dos. Con una, un selector de una
+          opcion es ruido que hay que leer para descubrir que no decide nada. */}
+      {estado.paypal?.disponible ? (
+        <div className="mt-4 grid gap-2 sm:grid-cols-2">
+          <Via
+            activa={!porPaypal}
+            onClick={() => cambiarVia('STRIPE')}
+            icono={<Banknote size={15} />}
+            titulo="A mi cuenta bancaria"
+            detalle="Llega en cuanto la empresa aprueba. Hay que verificar la cuenta una vez."
+          />
+          <Via
+            activa={porPaypal}
+            onClick={() => cambiarVia('PAYPAL')}
+            icono={<Wallet size={15} />}
+            titulo="A mi PayPal"
+            detalle="Solo hace falta tu correo. Tarda unos días más: sale por lotes."
+          />
+        </div>
+      ) : null}
+
+      {porPaypal ? (
+        <div className="mt-4">
+          <label className="block text-[12px] font-bold uppercase tracking-[0.07em] text-ink/40">
+            Tu correo de PayPal
+          </label>
+          <div className="mt-1.5 flex flex-wrap items-center gap-2">
+            <input
+              type="email"
+              value={correo}
+              onChange={(e) => setCorreo(e.target.value)}
+              placeholder="tucorreo@ejemplo.com"
+              className="field !mt-0 min-w-[240px] flex-1"
+            />
+            <button
+              type="button"
+              onClick={guardarCorreo}
+              disabled={ocupado || !correo.trim() || correo === estado.paypal?.email}
+              className="btn-primary"
+            >
+              {ocupado ? <Spinner size={14} /> : <Check size={14} />} Guardar
+            </button>
+          </div>
+
+          <ul className="mt-4 space-y-1.5 text-[12px] leading-relaxed text-ink/45">
+            <li className="flex gap-2">
+              <AlertTriangle size={13} className="mt-0.5 shrink-0 text-amber-500" />
+              Comprueba la dirección. El dinero va a quien tenga ese correo en PayPal, y si te
+              equivocas no lo podemos recuperar nosotros.
+            </li>
+            <li className="flex gap-2">
+              <Check size={13} className="mt-0.5 shrink-0 text-ink/25" />
+              Los pagos por PayPal salen agrupados, no al instante: cuenta unos días desde que la
+              empresa aprueba tu contenido. Por el banco es inmediato.
+            </li>
+            <li className="flex gap-2">
+              <Check size={13} className="mt-0.5 shrink-0 text-ink/25" />
+              Si no tienes cuenta de PayPal con ese correo, te llega un aviso para abrirla y
+              tienes 30 días para reclamar el dinero.
+            </li>
+            <li className="flex gap-2">
+              <Check size={13} className="mt-0.5 shrink-0 text-ink/25" />
+              Cobras el 88% de lo acordado, igual que por el banco. Lo que cobra PayPal lo
+              ponemos nosotros: a ti no se te descuenta nada más.
+            </li>
+          </ul>
+        </div>
+      ) : lista ? (
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <button
             type="button"
@@ -161,6 +299,7 @@ export default function CobrosCreador({ show }) {
         </div>
       )}
 
+      {porPaypal ? null : (
       <ul className="mt-4 space-y-1.5 text-[12px] leading-relaxed text-ink/45">
         <li className="flex gap-2">
           <Check size={13} className="mt-0.5 shrink-0 text-ink/25" />
@@ -176,6 +315,7 @@ export default function CobrosCreador({ show }) {
           que cobra la pasarela: a ti no se te descuenta nada más.
         </li>
       </ul>
+      )}
     </section>
   )
 }

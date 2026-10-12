@@ -87,6 +87,8 @@ export function privateCreator(creator) {
     taxId: creator.taxId,
     billingAddress: creator.billingAddress,
     irpfRate: creator.irpfRate,
+    payoutMethod: creator.payoutMethod,
+    paypalEmail: creator.paypalEmail,
   }
 }
 

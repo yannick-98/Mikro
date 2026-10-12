@@ -10,6 +10,8 @@ import { emitirFacturas, publicInvoice } from '../services/invoice.js'
 import { repartoDeal } from '../services/pay.js'
 import { stripeConfigured } from '../stripe/config.js'
 import { abrirCobro, devolver, transferirAlCreador } from '../stripe/payments.js'
+import { paypalConfigured } from '../paypal/config.js'
+import { encolarPago } from '../paypal/payouts.js'
 
 const router = Router()
 
@@ -370,14 +372,29 @@ router.post(
         where: { id: deal.id },
         include: {
           campaign: { select: { title: true } },
-          creator: { select: { id: true, displayName: true, stripePayoutsOk: true } },
+          creator: {
+            select: {
+              id: true,
+              displayName: true,
+              stripePayoutsOk: true,
+              payoutMethod: true,
+              paypalEmail: true,
+            },
+          },
         },
       })
 
       // Avisar ahora y no al liberar el pago: enterarse de que el creador no
       // puede cobrar despues de haberle pagado a Mikro es la peor forma de
       // descubrirlo.
-      if (!completo.creator?.stripePayoutsOk) {
+      //
+      // Cada via tiene su requisito y no son el mismo: por el banco hace
+      // falta el alta verificada de Stripe; por PayPal, basta con que nos
+      // haya dicho su correo. Comprobar siempre lo de Stripe dejaria sin
+      // cobrar a quien eligio la otra via y lo tiene todo en regla.
+      const porPaypal = completo.creator?.payoutMethod === 'PAYPAL' && paypalConfigured()
+      const listo = porPaypal ? !!completo.creator?.paypalEmail : completo.creator?.stripePayoutsOk
+      if (!listo) {
         throw badRequest(
           'Este creador todavía no ha terminado su alta de cobros. Le hemos avisado; en cuanto la complete podrás pagar.',
         )
@@ -480,8 +497,15 @@ router.post(
     }
 
     if (action === 'release') {
-      if (conStripe) {
-        const creator = await prisma.creator.findUnique({ where: { id: deal.creatorId } })
+      const creator = await prisma.creator.findUnique({ where: { id: deal.creatorId } })
+
+      // Por PayPal el pago se encola, no sale. El saldo de PayPal es otro
+      // bolsillo distinto del de Stripe y lo llena una persona: ver
+      // paypal/config.js. Lo que no cambia es que el dinero de la empresa ya
+      // estaba cobrado y que a partir de aqui es del creador.
+      if (creator?.payoutMethod === 'PAYPAL' && paypalConfigured()) {
+        await encolarPago(deal, creator)
+      } else if (conStripe) {
         // No se puede transferir a una cuenta que Stripe no ha verificado, y
         // decirlo asi es mas util que un error de la pasarela.
         await transferirAlCreador({ ...deal, status: rule.to }, creator)

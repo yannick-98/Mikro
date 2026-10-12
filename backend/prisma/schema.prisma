@@ -154,6 +154,17 @@ model Creator {
   stripePayoutsOk   Boolean   @default(false)
   stripePendiente   String?
   stripeOnboardedAt DateTime?
+
+  // Por donde quiere cobrar.
+  //
+  //   STRIPE  a su cuenta bancaria. Sale del dinero que ya esta cobrado, asi
+  //           que se envia al aprobar el contenido y no espera a nadie.
+  //   PAYPAL  a su correo de PayPal. Hace falta para quien no quiere dar su
+  //           IBAN, y tiene un coste que no tiene la otra: PayPal se lleva
+  //           ~2% y el pago sale en lotes, porque el saldo de PayPal es otro
+  //           bolsillo distinto del de Stripe (ver paypal/config.js).
+  payoutMethod String  @default("STRIPE") // STRIPE | PAYPAL
+  paypalEmail  String?
 }
 
 // Una cuenta de red social del creador.
@@ -517,7 +528,7 @@ model Payment {
   // respalda. SIMULATED existe para desarrollo y para que la aplicacion
   // funcione sin credenciales, pero la interfaz tiene que decirlo cuando lo
   // use: prometer una garantia que no existe es peor que no tenerla.
-  provider       String   @default("SIMULATED") // STRIPE | SIMULATED
+  provider       String  @default("SIMULATED") // STRIPE | SIMULATED
   // pi_... un cobro, tr_... una transferencia, re_... una devolucion.
   stripeId       String?
   // Lo que Stripe cobra por el movimiento, EN CENTIMOS. Sale de nuestra
@@ -529,9 +540,23 @@ model Payment {
   // cuentas al cabo de mil cobros. Nulo cuando todavia no se sabe: Stripe
   // tarda un instante en calcularla, y cero significaria "no costo nada".
   stripeFeeCents Int?
-  error          String?
-  reference      String?
-  createdAt      DateTime @default(now())
+
+  // PayPal. Son campos aparte y no los de Stripe reaprovechados porque no son
+  // lo mismo: un lote de PayPal agrupa varios pagos, asi que un pago tiene
+  // dos identificadores (el del lote y el suyo dentro del lote) donde uno de
+  // Stripe tiene uno. Juntarlos ahorraria dos columnas y costaria no poder
+  // contestar "¿en que lote salio esto?", que es la primera pregunta cuando
+  // algo no llega.
+  paypalBatchId  String?
+  paypalItemId   String?
+  // El correo al que se envio, copiado aqui a proposito: si el creador lo
+  // cambia manana, esta fila tiene que seguir diciendo adonde fue el dinero.
+  paypalEmail    String?
+  paypalFeeCents Int?
+
+  error     String?
+  reference String?
+  createdAt DateTime @default(now())
 }
 
 // ---------------------------------------------------------------------------

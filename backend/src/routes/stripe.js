@@ -10,6 +10,7 @@ import { prisma } from '../lib/prisma.js'
 import { asyncHandler, badRequest, notFound } from '../lib/http.js'
 import { requireRole } from '../middleware/auth.js'
 import { stripeConfigured } from '../stripe/config.js'
+import { paypalConfigured } from '../paypal/config.js'
 import {
   asegurarCuenta,
   enlaceDeAlta,
@@ -41,9 +42,23 @@ router.get(
         stripeChargesOk: true,
         stripePendiente: true,
         stripeOnboardedAt: true,
+        payoutMethod: true,
+        paypalEmail: true,
       },
     })
-    res.json({ configurado: stripeConfigured(), ...estadoCobros(creator) })
+    res.json({
+      configurado: stripeConfigured(),
+      ...estadoCobros(creator),
+      // La otra via. Se manda desde aqui y no desde el perfil porque es la
+      // misma pregunta —"¿a donde va mi dinero?"— y partirla en dos pantallas
+      // es como se acaba con un creador que ha elegido PayPal y sigue viendo
+      // que le falta el alta del banco.
+      paypal: {
+        disponible: paypalConfigured(),
+        elegido: creator?.payoutMethod === 'PAYPAL',
+        email: creator?.paypalEmail || null,
+      },
+    })
   }),
 )
 
