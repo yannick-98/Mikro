@@ -25,7 +25,9 @@ import { stripe } from '../src/stripe/config.js'
 import { createApp } from '../src/app.js'
 
 const s = stripe()
-const SECRETO = process.env.STRIPE_WEBHOOK_SECRET
+// Ahora hay dos secretos (uno por endpoint) separados por comas. Para
+// firmar aqui basta el primero: el servidor los prueba todos.
+const SECRETO = (process.env.STRIPE_WEBHOOK_SECRET || '').split(',')[0].trim()
 
 let bien = 0
 let mal = 0

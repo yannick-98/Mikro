@@ -177,3 +177,50 @@ impagos. Hay que leerla, no solo pulsarla.
 tarifa internacional (~3,2 %) y en el circuito salen ~8 € sobre 250. Con una
 tarjeta europea real son ~4 €, que es la cifra con la que están hechas las
 cuentas del plan.
+
+---
+
+## Hacen falta dos endpoints de webhook
+
+Esto solo apareció probando contra producción, y el fallo habría sido
+silencioso.
+
+`account.updated` de una cuenta conectada es un **evento de Connect**, y un
+endpoint normal no los recibe. Stripe no permite que uno solo escuche las dos
+cosas: hay que tener dos, y cada uno trae su propio secreto de firma.
+
+| Endpoint | Marcado | Eventos |
+|---|---|---|
+| de la cuenta | — | `checkout.session.completed`, `payment_intent.payment_failed`, `transfer.reversed` |
+| de cuentas conectadas | **connect** | `account.updated` |
+
+Los dos apuntan a la misma URL; nuestro manejador reparte por tipo de evento.
+
+**Qué habría pasado sin el segundo:** un creador termina su alta, Stripe la
+aprueba, y en Mikro su perfil se queda para siempre en «te falta algo». Nunca
+podría cobrar, ninguna empresa podría pagarle, y en los registros no habría
+ningún error. Ninguna prueba local lo habría visto, porque en local el webhook
+se lo entrega el propio script.
+
+`STRIPE_WEBHOOK_SECRET` admite por eso **varios secretos separados por comas**.
+La verificación prueba cada uno y basta con que valide uno; si ninguno lo hace,
+se rechaza igual que antes.
+
+```
+STRIPE_WEBHOOK_SECRET="whsec_elDeLaCuenta,whsec_elDeConnect"
+```
+
+### Probarlo
+
+```bash
+npm run stripe:entrega
+```
+
+Provoca un evento real, deja que Stripe lo entregue **por internet** al
+servidor desplegado y comprueba que llegó por el rastro que deja en la base.
+Es lo único que no se puede probar en local, porque Stripe no llama a un
+`localhost`.
+
+Un detalle: el contador `pending_webhooks` de Stripe tarda unos segundos en
+bajar a cero aunque la entrega ya haya ocurrido. La prueba espera, en vez de
+dar por fallido algo que solo iba con retraso.
