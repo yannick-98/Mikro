@@ -19,12 +19,25 @@ import { prisma } from '../lib/prisma.js'
 import { decrypt, encrypt } from '../lib/secrets.js'
 import { computeScore } from '../services/scoring.js'
 import { resumirCuenta } from './metrics.js'
-import { disponible } from './config.js'
+import { proveedorPorHandle } from './porHandle.js'
+import { cuentaParaElPerfil } from './propiedad.js'
 import instagram from './providers/instagram.js'
 import tiktok from './providers/tiktok.js'
 import youtube from './providers/youtube.js'
 
 export const proveedores = { instagram, tiktok, youtube }
+
+/**
+ * De donde se traen los datos de una cuenta concreta.
+ *
+ * Lo decide la cuenta y no la plataforma, porque las dos cosas pueden
+ * convivir: un creador da de alta su Instagram con solo el @ y el de al lado
+ * lo conecta de verdad, y las dos cuentas se sincronizan igual de bien.
+ */
+export function implementacionDe(cuenta) {
+  if (cuenta.metodo === 'LOOKUP') return proveedorPorHandle(cuenta.platform)
+  return proveedores[cuenta.platform] || null
+}
 
 /** Margen con el que se renueva un token antes de que caduque. */
 const MARGEN_MS = 10 * 60 * 1000
@@ -73,11 +86,11 @@ export async function sincronizarCuenta(cuentaId) {
   const cuenta = await prisma.socialAccount.findUnique({ where: { id: cuentaId } })
   if (!cuenta) return { ok: false, error: 'La cuenta no existe' }
   if (cuenta.source !== 'CONNECTED') return { ok: false, error: 'Esa cuenta no está conectada' }
-  if (!disponible(cuenta.platform)) {
-    return { ok: false, error: `La conexión con ${cuenta.platform} no está configurada` }
-  }
 
-  const prov = proveedores[cuenta.platform]
+  const prov = implementacionDe(cuenta)
+  if (!prov) {
+    return { ok: false, error: `Ahora mismo no se pueden leer los datos de ${cuenta.platform}` }
+  }
 
   try {
     let token = null
@@ -178,8 +191,12 @@ export async function sincronizarCuenta(cuentaId) {
  */
 export async function recalcularCreador(creatorId) {
   const cuentas = await prisma.socialAccount.findMany({ where: { creatorId } })
-  const conectadas = cuentas.filter((c) => c.source === 'CONNECTED' && c.followers > 0)
-  const base = conectadas.length ? conectadas : cuentas
+  const conectadas = cuentas.filter(cuentaParaElPerfil)
+  // Lo que se ensena cuando todavia no hay nada comprobado es lo que el
+  // creador declaro, no las cifras de una cuenta por @ sin verificar: esas
+  // son numeros de verdad de una cuenta que quiza no es suya, que es
+  // precisamente lo que no se puede publicar.
+  const base = conectadas.length ? conectadas : cuentas.filter((c) => c.source === 'DECLARED')
 
   const followers = base.reduce((a, c) => a + (c.followers || 0), 0)
   const engagement = followers
@@ -218,12 +235,25 @@ export async function recalcularCreador(creatorId) {
  * Pensado para una tarea periodica. De una en una y no en paralelo: a las
  * plataformas no les gusta que les llueva, y aqui no hay ninguna prisa.
  */
-export async function sincronizarPendientes({ horas = 24, limite = 50 } = {}) {
-  const corte = new Date(Date.now() - horas * 3600000)
+export async function sincronizarPendientes({ horas = 24, horasLookup = 72, limite = 50 } = {}) {
+  const vencida = (h) => ({
+    OR: [{ lastSyncAt: null }, { lastSyncAt: { lt: new Date(Date.now() - h * 3600000) } }],
+  })
+
+  // Instagram y TikTok por @ pasan por un servicio que cobra por consulta, y
+  // se refrescan cada tres dias en vez de cada dia. Los seguidores de alguien
+  // no cambian lo suficiente en veinticuatro horas para pagar por verlo: con
+  // mil creadores, la diferencia entre un dia y tres son dos tercios de la
+  // factura por un dato que nadie habria notado.
+  const dePago = { metodo: 'LOOKUP', platform: { in: ['instagram', 'tiktok'] } }
+
   const cuentas = await prisma.socialAccount.findMany({
     where: {
       source: 'CONNECTED',
-      OR: [{ lastSyncAt: null }, { lastSyncAt: { lt: corte } }],
+      OR: [
+        { ...dePago, ...vencida(horasLookup) },
+        { NOT: dePago, ...vencida(horas) },
+      ],
     },
     orderBy: { lastSyncAt: 'asc' },
     take: limite,
@@ -238,4 +268,11 @@ export async function sincronizarPendientes({ horas = 24, limite = 50 } = {}) {
   return resultados
 }
 
-export default { sincronizarCuenta, sincronizarPendientes, recalcularCreador, proveedores }
+export default {
+  sincronizarCuenta,
+  sincronizarPendientes,
+  recalcularCreador,
+  proveedores,
+  implementacionDe,
+  cuentaParaElPerfil,
+}

@@ -5,13 +5,23 @@
  * en lo que una marca puede gastarse el dinero: los seguidores y el engagement
  * dejan de ser lo que alguien escribio en un formulario.
  *
- * Nota sobre el camino elegido. Hay dos formas de conseguir estos datos:
- * raspar los perfiles publicos, o pedirle al creador que conecte su cuenta.
- * Lo primero es mas rapido de montar y es un error: va contra las condiciones
- * de las plataformas, se rompe cada vez que cambian el HTML, y sobre todo no
- * resuelve el problema, porque desde fuera no se ve nada que no se pueda
- * falsear. Conectar la cuenta es mas trabajo y es lo unico que permite decir
- * "esto es real" sin mentir.
+ * ## Dos caminos, y por que
+ *
+ * **Por el @** (`/:platform/handle`). El creador escribe su usuario y las
+ * cifras las traemos nosotros de lo publico. Es el camino normal porque es el
+ * unico que no le saca de Mikro: en una pantalla de permisos de Instagram que
+ * habla de "acceso a tu contenido" se cae gente, y se cae justo la que
+ * todavia no conoce la marca.
+ *
+ * **Autorizando** (`/:platform/connect`). Mas friccion y mejor dato. Queda
+ * como paso opcional para quien quiera el sello completo.
+ *
+ * El problema del primero no son las cifras: son reales y las calculamos
+ * nosotros igual. El problema es que **cualquiera puede escribir el @ de
+ * otro**. Eso no es un dato mal puesto, es venderle a una marca una audiencia
+ * ajena y cobrarla. Por eso una cuenta dada de alta por el @ no cuenta para el
+ * perfil publico hasta que su dueno pega un codigo en la biografia
+ * (`/:platform/verificar`). Autorizar, en cambio, ya es prueba por si mismo.
  */
 import { Router } from 'express'
 import { z } from 'zod'
@@ -21,8 +31,10 @@ import { prisma } from '../lib/prisma.js'
 import { asyncHandler, badRequest, notFound, parseBody } from '../lib/http.js'
 import { requireRole } from '../middleware/auth.js'
 import { encrypt, secretsConfigured } from '../lib/secrets.js'
-import { APP_URL, disponible, estadoPlataformas, MODO } from '../social/config.js'
+import { APP_URL, estadoPlataformas, modosDe, PLATAFORMAS } from '../social/config.js'
 import { proveedores, recalcularCreador, sincronizarCuenta } from '../social/sync.js'
+import { proveedorPorHandle } from '../social/porHandle.js'
+import { codigoPara, cuentaParaElPerfil, instrucciones } from '../social/propiedad.js'
 
 const router = Router()
 
@@ -57,6 +69,12 @@ const cuentaPrivada = (c) => ({
   handle: c.handle,
   url: c.url,
   source: c.source,
+  metodo: c.metodo,
+  verificada: !!c.ownershipVerifiedAt,
+  ownershipVerifiedAt: c.ownershipVerifiedAt,
+  // Lo que de verdad quiere saber el creador cuando mira esta pantalla: si
+  // estas cifras las esta viendo alguien mas que el.
+  enElPerfil: cuentaParaElPerfil(c),
   followers: c.followers,
   engagement: c.engagement,
   avgViews: c.avgViews,
@@ -113,8 +131,9 @@ router.post(
   requireRole('CREATOR'),
   asyncHandler(async (req, res) => {
     const { platform } = req.params
-    if (MODO[platform] !== 'oauth') throw badRequest('Esa plataforma no se conecta así')
-    if (!disponible(platform)) throw badRequest(`La conexión con ${platform} no está configurada`)
+    if (!modosDe(platform).includes('oauth')) {
+      throw badRequest('Esa plataforma no se conecta así')
+    }
     if (!secretsConfigured()) {
       throw badRequest('Falta configurar el cifrado de credenciales (SECRETS_KEY)')
     }
@@ -163,6 +182,10 @@ router.get(
           url: perfil.url,
           followers: perfil.followers,
           source: 'CONNECTED',
+          metodo: 'OAUTH',
+          // Autorizar es la prueba: nadie entra en la cuenta de otro para
+          // darnos permiso sobre ella.
+          ownershipVerifiedAt: new Date(),
           externalId: perfil.externalId || token.externalId,
           accessToken: encrypt(token.accessToken),
           refreshToken: token.refreshToken ? encrypt(token.refreshToken) : null,
@@ -175,6 +198,8 @@ router.get(
           url: perfil.url,
           followers: perfil.followers,
           source: 'CONNECTED',
+          metodo: 'OAUTH',
+          ownershipVerifiedAt: new Date(),
           externalId: perfil.externalId || token.externalId,
           accessToken: encrypt(token.accessToken),
           refreshToken: token.refreshToken ? encrypt(token.refreshToken) : null,
@@ -195,52 +220,158 @@ router.get(
   }),
 )
 
+const laCuenta = (creatorId, platform) =>
+  prisma.socialAccount.findUnique({ where: { creatorId_platform: { creatorId, platform } } })
+
 /**
- * YouTube: basta con decirnos el canal.
+ * Dar de alta una cuenta con solo el @.
  *
- * No hay autorización, así que esto comprueba cifras pero no identidad. Para
- * lo segundo está /youtube/verificar, con un código en la descripción del
- * canal, que es algo que solo puede poner quien tiene las llaves.
+ * Esto es el camino normal. El creador escribe su usuario, se consulta el
+ * perfil ahí mismo y se le devuelven sus cifras de verdad en la misma
+ * respuesta: no hay "vuelve mañana" ni pantalla de permisos.
+ *
+ * Ojo con lo que esto **no** hace: no comprueba de quién es la cuenta. Hasta
+ * que el creador pase por /verificar, las cifras son suyas de ver pero no
+ * salen al escaparate, y la respuesta lo dice en `enElPerfil` para que la
+ * pantalla no tenga que adivinarlo.
  */
 router.post(
-  '/youtube',
+  '/:platform/handle',
   requireRole('CREATOR'),
   asyncHandler(async (req, res) => {
-    const { canal } = parseBody(z.object({ canal: z.string().trim().min(2).max(200) }), req.body)
-    if (!disponible('youtube')) throw badRequest('La conexión con YouTube no está configurada')
+    const { platform } = req.params
+    if (!PLATAFORMAS.includes(platform)) throw notFound('Esa red no existe')
+
+    const cuerpo = parseBody(
+      z.object({
+        handle: z.string().trim().min(2).max(200).optional(),
+        // canal, por compatibilidad con lo que enviaba la pantalla de YouTube.
+        canal: z.string().trim().min(2).max(200).optional(),
+      }),
+      req.body,
+    )
+    const handle = cuerpo.handle || cuerpo.canal || ''
+    if (handle.length < 2) throw badRequest('Dinos tu usuario, por ejemplo @mikro')
+
+    const prov = proveedorPorHandle(platform)
+    if (!prov) {
+      throw badRequest(
+        platform === 'youtube'
+          ? 'La lectura de YouTube no está configurada'
+          : `Ahora mismo no podemos leer perfiles de ${platform}. Puedes conectar la cuenta.`,
+      )
+    }
 
     let perfil
     try {
-      perfil = await proveedores.youtube.fetchProfile(null, canal)
+      perfil = await prov.fetchProfile(null, handle)
     } catch (e) {
       throw badRequest(e.message)
     }
 
+    const comun = {
+      handle: perfil.handle,
+      url: perfil.url,
+      followers: perfil.followers,
+      source: 'CONNECTED',
+      metodo: 'LOOKUP',
+      externalId: perfil.externalId,
+      syncError: null,
+    }
+
+    const existente = await laCuenta(req.user.creator.id, platform)
+    // Cambiar de @ invalida la verificación anterior: lo comprobado era que
+    // la cuenta vieja era suya, no la nueva.
+    const cambiaDeCuenta = existente && existente.handle !== perfil.handle
+
     const cuenta = await prisma.socialAccount.upsert({
-      where: { creatorId_platform: { creatorId: req.user.creator.id, platform: 'youtube' } },
-      create: {
-        creatorId: req.user.creator.id,
-        platform: 'youtube',
-        handle: perfil.handle,
-        url: perfil.url,
-        followers: perfil.followers,
-        source: 'CONNECTED',
-        externalId: perfil.externalId,
-        connectedAt: new Date(),
-      },
-      update: {
-        handle: perfil.handle,
-        url: perfil.url,
-        followers: perfil.followers,
-        source: 'CONNECTED',
-        externalId: perfil.externalId,
-        syncError: null,
-      },
+      where: { creatorId_platform: { creatorId: req.user.creator.id, platform } },
+      create: { creatorId: req.user.creator.id, platform, ...comun, connectedAt: new Date() },
+      update: { ...comun, ...(cambiaDeCuenta ? { ownershipVerifiedAt: null } : {}) },
     })
 
     const r = await sincronizarCuenta(cuenta.id)
-    const actualizada = await prisma.socialAccount.findUnique({ where: { id: cuenta.id } })
-    res.json({ account: cuentaPrivada(actualizada), sincronizada: r.ok, error: r.error || null })
+    const actualizada = await laCuenta(req.user.creator.id, platform)
+
+    res.json({
+      account: cuentaPrivada(actualizada),
+      sincronizada: r.ok,
+      error: r.error || null,
+      propiedad: actualizada.ownershipVerifiedAt
+        ? null
+        : instrucciones(platform, codigoPara(req.user.creator.id, platform)),
+    })
+  }),
+)
+
+/** El código que hay que pegar en la biografía, y dónde. */
+router.get(
+  '/:platform/propiedad',
+  requireRole('CREATOR'),
+  asyncHandler(async (req, res) => {
+    const { platform } = req.params
+    if (!PLATAFORMAS.includes(platform)) throw notFound('Esa red no existe')
+    const cuenta = await laCuenta(req.user.creator.id, platform)
+    res.json({
+      ...instrucciones(platform, codigoPara(req.user.creator.id, platform)),
+      verificada: !!cuenta?.ownershipVerifiedAt,
+    })
+  }),
+)
+
+/**
+ * Comprueba el código y, si está, da la cuenta por verificada.
+ *
+ * A partir de aquí sus cifras entran en el perfil público, así que se vuelven
+ * a calcular los agregados del creador en el momento.
+ */
+router.post(
+  '/:platform/verificar',
+  requireRole('CREATOR'),
+  asyncHandler(async (req, res) => {
+    const { platform } = req.params
+    const cuenta = await laCuenta(req.user.creator.id, platform)
+    if (!cuenta) throw notFound('No tienes esa cuenta dada de alta')
+
+    const prov = proveedorPorHandle(platform)
+    if (!prov?.verificarPropiedad) throw badRequest('Esa red no se puede verificar así')
+
+    const codigo = codigoPara(req.user.creator.id, platform)
+    let encontrado
+    try {
+      encontrado = await prov.verificarPropiedad(cuenta.externalId || cuenta.handle, codigo)
+    } catch (e) {
+      throw badRequest(e.message)
+    }
+
+    if (!encontrado) {
+      return res.json({
+        verificada: false,
+        // Sin esto, el creador que ha puesto el codigo y ha dado a comprobar
+        // demasiado pronto no sabe si se equivoco o si solo fue rapido.
+        motivo:
+          'No encontramos el código. Si lo acabas de poner, espera un minuto: las redes tardan un rato en publicar el cambio.',
+        ...instrucciones(platform, codigo),
+      })
+    }
+
+    await prisma.socialAccount.update({
+      where: { id: cuenta.id },
+      data: { ownershipVerifiedAt: new Date() },
+    })
+    const creator = await recalcularCreador(req.user.creator.id)
+    const actualizada = await laCuenta(req.user.creator.id, platform)
+
+    res.json({
+      verificada: true,
+      account: cuentaPrivada(actualizada),
+      creator: {
+        totalFollowers: creator.totalFollowers,
+        engagementRate: creator.engagementRate,
+        postsPerWeek: creator.postsPerWeek,
+        metricsSource: creator.metricsSource,
+      },
+    })
   }),
 )
 

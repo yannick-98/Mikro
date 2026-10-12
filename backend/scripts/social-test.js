@@ -199,5 +199,287 @@ try {
 }
 check('sin clave configurada, cifrar falla en vez de guardar en claro', lanzo)
 
+
+// ---------------------------------------------------------------------------
+console.log('\n--- Alta por @: normalizar lo que escriba la gente ---')
+
+const { normalizarHandle, consultar, vaciarCache, lookupDisponible, proveedorLookup } =
+  await import('../src/social/lookup.js')
+
+check('con arroba', normalizarHandle('@pepe') === 'pepe')
+check('sin arroba', normalizarHandle('pepe') === 'pepe')
+check('con espacios', normalizarHandle('  @pepe  ') === 'pepe')
+check('pegando la URL de Instagram', normalizarHandle('https://instagram.com/pepe/') === 'pepe')
+check(
+  'pegando la URL de TikTok, que lleva arroba',
+  normalizarHandle('https://www.tiktok.com/@pepe') === 'pepe',
+  normalizarHandle('https://www.tiktok.com/@pepe'),
+)
+check('con puntos y guiones bajos, que son validos', normalizarHandle('@pe.pe_1') === 'pe.pe_1')
+
+console.log('\n--- Sin servicio configurado no se promete nada ---')
+
+delete process.env.APIFY_TOKEN
+delete process.env.SOCIAL_LOOKUP_PROVIDER
+check('sin credenciales, no hay proveedor', proveedorLookup() === '')
+check('y la plataforma no esta disponible por @', lookupDisponible('instagram') === false)
+
+let fallo = null
+try {
+  await consultar('instagram', '@pepe')
+} catch (e) {
+  fallo = e.message
+}
+check('consultar falla con un motivo claro', /servicio de consulta/.test(fallo || ''), fallo)
+
+process.env.APIFY_TOKEN = 'apify_token_de_prueba'
+check('con token, el proveedor es apify', proveedorLookup() === 'apify')
+check('instagram se puede consultar', lookupDisponible('instagram') === true)
+check('tiktok tambien', lookupDisponible('tiktok') === true)
+// YouTube tiene API oficial y gratis: no tiene por que pasar por un servicio
+// de pago, y confundirlo seria pagar por lo que ya es gratis.
+check('youtube no pasa por el servicio de pago', lookupDisponible('youtube') === false)
+
+console.log('\n--- Lo que devuelve el servicio se traduce a lo nuestro ---')
+
+// El fetch se sustituye por uno de mentira: estas pruebas comprueban la
+// traduccion de la respuesta, que es donde esta el riesgo. Lo que no se puede
+// probar aqui es que el servicio siga devolviendo estos campos; de eso avisa
+// el syncError de la cuenta, que es visible.
+const fetchReal = globalThis.fetch
+let llamadas = []
+const responder = (cuerpo, status = 200) => {
+  globalThis.fetch = async (url, opciones) => {
+    llamadas.push({ url: String(url), body: JSON.parse(opciones?.body || '{}') })
+    return { ok: status >= 200 && status < 300, status, json: async () => cuerpo }
+  }
+}
+
+const AHORA_ISO = AHORA.toISOString()
+
+vaciarCache()
+llamadas = []
+responder([
+  {
+    id: '555',
+    username: 'pepe',
+    followersCount: 12000,
+    profilePicUrl: 'https://cdn/x.jpg',
+    biography: 'Fotografo en Madrid',
+    latestPosts: [
+      {
+        id: 'p1',
+        shortCode: 'abc',
+        type: 'Video',
+        caption: 'uno',
+        likesCount: 400,
+        commentsCount: 20,
+        videoPlayCount: 9000,
+        timestamp: AHORA_ISO,
+        displayUrl: 'https://cdn/1.jpg',
+      },
+      {
+        id: 'p2',
+        type: 'Image',
+        likesCount: 300,
+        commentsCount: 10,
+        timestamp: haceDias(5).toISOString(),
+      },
+    ],
+  },
+])
+
+const ig = await consultar('instagram', '@PEPE')
+check('los seguidores salen del perfil', ig.perfil.followers === 12000)
+check('el @ se guarda como lo dice la plataforma', ig.perfil.handle === 'pepe')
+check('la URL del perfil se arma sola', ig.perfil.url === 'https://instagram.com/pepe')
+check('la biografia viene, que hace falta para verificar', /Madrid/.test(ig.perfil.descripcion))
+check('llegan las dos publicaciones', ig.posts.length === 2, `${ig.posts.length}`)
+check('los likes se traducen', ig.posts[0].likes === 400)
+check('los comentarios tambien', ig.posts[0].comments === 20)
+check('las visualizaciones de un video', ig.posts[0].views === 9000)
+check('un video se marca como video', ig.posts[0].mediaType === 'VIDEO')
+check('una foto no', ig.posts[1].mediaType === 'IMAGE')
+check('la fecha se convierte a Date', ig.posts[0].publishedAt instanceof Date)
+check('se pide solo ese usuario', llamadas[0]?.body?.usernames?.[0] === 'PEPE', JSON.stringify(llamadas[0]?.body))
+// El token va en la URL del servicio, no en el cuerpo. Da igual donde, pero
+// no en los dos sitios: un secreto repetido es un secreto que se filtra por
+// el sitio que nadie estaba mirando.
+check(
+  'el token no viaja en el cuerpo',
+  !JSON.stringify(llamadas[0]?.body || {}).includes('apify_token'),
+)
+
+// Lo importante de todo esto: con esas publicaciones, el engagement lo
+// calculamos nosotros, con el mismo codigo que ya estaba probado arriba. El
+// creador no escribe ninguna cifra en ningun sitio.
+const resumenLookup = resumirCuenta({
+  posts: ig.posts,
+  followers: ig.perfil.followers,
+  ahora: AHORA,
+})
+check(
+  'el engagement se calcula de las publicaciones traidas',
+  resumenLookup.engagement > 0,
+  `${resumenLookup.engagement}%`,
+)
+
+console.log('\n--- El cache evita pagar dos veces la misma consulta ---')
+
+// sincronizarCuenta pide el perfil y luego las publicaciones. Si eso fueran
+// dos consultas, la factura seria el doble por el mismo dato.
+const antes = llamadas.length
+await consultar('instagram', '@pepe')
+check('la segunda consulta no sale a la red', llamadas.length === antes)
+vaciarCache()
+await consultar('instagram', '@pepe')
+check('tras vaciar el cache, si sale', llamadas.length === antes + 1)
+
+console.log('\n--- TikTok viene al reves: videos con el autor dentro ---')
+
+vaciarCache()
+llamadas = []
+responder([
+  {
+    id: 'v1',
+    text: 'baile',
+    createTimeISO: AHORA_ISO,
+    diggCount: 5000,
+    commentCount: 80,
+    shareCount: 40,
+    playCount: 120000,
+    webVideoUrl: 'https://tiktok.com/@ana/video/v1',
+    videoMeta: { coverUrl: 'https://cdn/c.jpg' },
+    authorMeta: { id: '9', name: 'ana', fans: 45000, signature: 'mikro-abc123 en la bio' },
+  },
+  {
+    id: 'v2',
+    createTime: Math.floor(haceDias(3).getTime() / 1000),
+    diggCount: 3000,
+    commentCount: 20,
+    authorMeta: { name: 'ana', fans: 45000 },
+  },
+])
+
+const tt = await consultar('tiktok', 'ana')
+check('los seguidores salen del autor del video', tt.perfil.followers === 45000)
+check('el @ sale del autor', tt.perfil.handle === 'ana')
+check('la URL de TikTok lleva arroba', tt.perfil.url === 'https://tiktok.com/@ana')
+check('llegan los dos videos', tt.posts.length === 2)
+check('diggCount son los likes', tt.posts[0].likes === 5000)
+check('playCount son las visualizaciones', tt.posts[0].views === 120000)
+check('los compartidos se guardan', tt.posts[0].shares === 40)
+check(
+  'createTime en segundos se convierte bien',
+  tt.posts[1].publishedAt?.toISOString().slice(0, 10) === haceDias(3).toISOString().slice(0, 10),
+)
+check('se piden las publicaciones del perfil', llamadas[0]?.body?.profiles?.[0] === 'ana')
+
+console.log('\n--- Cuando el servicio falla, se dice que ha fallado ---')
+
+vaciarCache()
+responder({ error: { message: 'sin saldo' } }, 402)
+let msg402 = null
+try {
+  await consultar('instagram', 'pepe')
+} catch (e) {
+  msg402 = e.message
+}
+check('quedarse sin saldo tiene su propio aviso', /sin saldo/i.test(msg402 || ''), msg402)
+
+vaciarCache()
+responder([], 200)
+let msgVacio = null
+try {
+  await consultar('instagram', 'nopepe')
+} catch (e) {
+  msgVacio = e.message
+}
+check('un perfil que no existe lo dice', /no se encontró/i.test(msgVacio || ''), msgVacio)
+
+vaciarCache()
+responder([{ error: 'not_found', errorDescription: 'El perfil es privado' }])
+let msgPriv = null
+try {
+  await consultar('instagram', 'privado')
+} catch (e) {
+  msgPriv = e.message
+}
+check('un perfil privado explica por que', /privado/i.test(msgPriv || ''), msgPriv)
+
+globalThis.fetch = fetchReal
+
+// ---------------------------------------------------------------------------
+console.log('\n--- El codigo que prueba que la cuenta es tuya ---')
+
+process.env.JWT_SECRET = 'secreto-de-prueba'
+const { codigoPara, contiene, cuentaParaElPerfil } = await import('../src/social/propiedad.js')
+
+const c1 = codigoPara('creador-1', 'instagram')
+check('tiene la forma esperada', /^mikro-[0-9a-f]{6}$/.test(c1), c1)
+check('es el mismo si vuelve manana', codigoPara('creador-1', 'instagram') === c1)
+check('es distinto en otra red', codigoPara('creador-1', 'tiktok') !== c1)
+// Si fuera adivinable, cualquiera podria poner el codigo de otro en su propia
+// biografia y verificar una cuenta que no es suya.
+check('es distinto para otro creador', codigoPara('creador-2', 'instagram') !== c1)
+
+check('se encuentra tal cual', contiene(`Fotógrafo · ${c1}`, c1))
+check('en mayusculas tambien', contiene(c1.toUpperCase(), c1))
+check('con el guion raro que mete el movil', contiene(c1.replace('-', '–'), c1))
+check('con espacios alrededor', contiene(`  ${c1}  `, c1))
+check('si no esta, no esta', contiene('Fotógrafo en Madrid', c1) === false)
+check('un codigo parecido no vale', contiene('mikro-000000', c1) === false)
+
+console.log('\n--- Que cuentas salen al escaparate ---')
+
+const base = { source: 'CONNECTED', followers: 10000 }
+check('autorizada, si', cuentaParaElPerfil({ ...base, metodo: 'OAUTH' }) === true)
+check(
+  'por @ y verificada, si',
+  cuentaParaElPerfil({ ...base, metodo: 'LOOKUP', ownershipVerifiedAt: AHORA }) === true,
+)
+// La que de verdad importa: cifras reales de una cuenta que quiza no es suya.
+check(
+  'por @ y sin verificar, NO',
+  cuentaParaElPerfil({ ...base, metodo: 'LOOKUP', ownershipVerifiedAt: null }) === false,
+)
+check(
+  'declarada, no',
+  cuentaParaElPerfil({ source: 'DECLARED', followers: 10000, metodo: 'OAUTH' }) === false,
+)
+check('sin seguidores, no', cuentaParaElPerfil({ ...base, followers: 0, metodo: 'OAUTH' }) === false)
+
+console.log('\n--- De cuantas formas se puede dar de alta cada red ---')
+
+process.env.APIFY_TOKEN = 'apify_token_de_prueba'
+process.env.YOUTUBE_API_KEY = 'clave-de-prueba'
+delete process.env.INSTAGRAM_APP_ID
+delete process.env.INSTAGRAM_APP_SECRET
+const { modosDe, estadoPlataformas } = await import('../src/social/config.js')
+
+check('youtube, solo por el canal', modosDe('youtube').join() === 'handle')
+check('instagram sin credenciales de OAuth, solo por @', modosDe('instagram').join() === 'handle')
+
+process.env.INSTAGRAM_APP_ID = 'id'
+process.env.INSTAGRAM_APP_SECRET = 'secreto'
+check(
+  'con las dos cosas, el @ va primero',
+  modosDe('instagram').join() === 'handle,oauth',
+  modosDe('instagram').join(),
+)
+
+delete process.env.APIFY_TOKEN
+check('sin servicio de consulta queda OAuth', modosDe('instagram').join() === 'oauth')
+
+delete process.env.INSTAGRAM_APP_ID
+check('sin nada, ninguna forma', modosDe('instagram').length === 0)
+
+delete process.env.YOUTUBE_API_KEY
+check('youtube sin clave tampoco', modosDe('youtube').length === 0)
+check(
+  'y la interfaz se entera de que no hay nada',
+  estadoPlataformas().every((p) => p.disponible === false && p.porHandle === false),
+)
+
 console.log(`\n=== ${passed} correctas, ${failed} fallidas ===\n`)
 process.exit(failed > 0 ? 1 : 0)

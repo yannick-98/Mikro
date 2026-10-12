@@ -5,6 +5,7 @@
  * credenciales de TikTok sigue funcionando: la pantalla dice que esa conexion
  * no esta disponible, en vez de ofrecer un boton que lleva a un error.
  */
+import { lookupDisponible } from './lookup.js'
 
 /**
  * El dominio publico de Mikro.
@@ -50,22 +51,60 @@ export const config = {
 
 export const PLATAFORMAS = ['instagram', 'tiktok', 'youtube']
 
-/** Si una plataforma puede usarse ahora mismo. */
-export function disponible(platform) {
-  if (platform === 'youtube') return !!config.youtube.apiKey()
+/**
+ * De cuantas formas se puede dar de alta cada red, de la mas facil a la mas
+ * completa.
+ *
+ *  - **handle**: el creador escribe su @ y los datos los traemos nosotros.
+ *    Es el camino normal, porque es el unico que no manda a nadie fuera de
+ *    Mikro. En YouTube va por la API oficial; en Instagram y TikTok, por un
+ *    servicio de consulta.
+ *  - **oauth**: el creador autoriza de verdad. Mas friccion y mejor dato (y
+ *    prueba por si mismo de quien es la cuenta), asi que se ofrece como paso
+ *    opcional para quien quiera el sello completo.
+ *
+ * Una plataforma puede tener las dos, una, o ninguna. Lo de "ninguna" no es
+ * teorico: cada forma necesita sus credenciales, y sin ellas la pantalla dice
+ * que no esta disponible en vez de ofrecer un boton que lleva a un error.
+ */
+export function modosDe(platform) {
+  const modos = []
+  if (platform === 'youtube') {
+    if (config.youtube.apiKey()) modos.push('handle')
+    return modos
+  }
+  if (lookupDisponible(platform)) modos.push('handle')
   const c = config[platform]
-  return !!(c && c.clientId() && c.clientSecret())
+  if (c && c.clientId() && c.clientSecret()) modos.push('oauth')
+  return modos
 }
 
-/** Como se conecta cada una, que la interfaz necesita saberlo. */
-export const MODO = {
-  instagram: 'oauth',
-  tiktok: 'oauth',
-  youtube: 'handle', // basta con decirnos el canal
+/** Si una plataforma puede usarse ahora mismo, de alguna forma. */
+export function disponible(platform) {
+  return modosDe(platform).length > 0
 }
+
+/** La forma preferida: la de menos friccion de las que haya. */
+export const modoDe = (platform) => modosDe(platform)[0] || null
 
 export function estadoPlataformas() {
-  return PLATAFORMAS.map((p) => ({ platform: p, modo: MODO[p], disponible: disponible(p) }))
+  return PLATAFORMAS.map((p) => ({
+    platform: p,
+    modo: modoDe(p),
+    modos: modosDe(p),
+    disponible: disponible(p),
+    // Lo que de verdad le interesa a la interfaz: si puede pedir solo el @.
+    porHandle: modosDe(p).includes('handle'),
+  }))
 }
 
-export default { config, PLATAFORMAS, MODO, disponible, estadoPlataformas, redirectUri, APP_URL }
+export default {
+  config,
+  PLATAFORMAS,
+  modosDe,
+  modoDe,
+  disponible,
+  estadoPlataformas,
+  redirectUri,
+  APP_URL,
+}

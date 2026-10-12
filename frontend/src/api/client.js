@@ -123,7 +123,11 @@ export const api = {
   socialPlatforms: () => request('/social/platforms'),
   mySocial: () => request('/social/me'),
   connectSocial: (platform) => request(`/social/${platform}/connect`, { method: 'POST' }),
-  connectYoutube: (canal) => request('/social/youtube', { method: 'POST', body: { canal } }),
+  // El camino normal: solo el @. Las cifras las traemos nosotros.
+  addSocialHandle: (platform, handle) =>
+    request(`/social/${platform}/handle`, { method: 'POST', body: { handle } }),
+  socialOwnership: (platform) => request(`/social/${platform}/propiedad`),
+  verifySocial: (platform) => request(`/social/${platform}/verificar`, { method: 'POST' }),
   syncSocial: (platform) => request(`/social/${platform}/sync`, { method: 'POST' }),
   disconnectSocial: (platform) => request(`/social/${platform}`, { method: 'DELETE' }),
 

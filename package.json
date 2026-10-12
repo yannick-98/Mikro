@@ -28,7 +28,8 @@
     "test:stripe": "node backend/scripts/stripe-test.js",
     "stripe:probar": "node backend/scripts/stripe-probar-clave.js",
     "stripe:circuito": "node --env-file=.env backend/scripts/circuito-stripe.mjs",
-    "stripe:entrega": "node --env-file=.env backend/scripts/entrega-webhook.mjs"
+    "stripe:entrega": "node --env-file=.env backend/scripts/entrega-webhook.mjs",
+    "stripe:real": "node backend/scripts/stripe-modo-real.mjs"
   },
   "dependencies": {
     "@fontsource/inter": "^5.1.0",

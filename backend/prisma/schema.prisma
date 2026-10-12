@@ -182,6 +182,20 @@ model SocialAccount {
 
   source String @default("DECLARED") // DECLARED | CONNECTED
 
+  // De donde salen los datos, que no es lo mismo que si los tenemos.
+  //
+  //   LOOKUP  el creador nos dio su @ y los leemos nosotros. Es el camino
+  //           normal: no le saca de Mikro. En YouTube va por la API oficial;
+  //           en Instagram y TikTok, por un servicio de consulta de pago.
+  //   OAUTH   el creador autorizo de verdad. Mas friccion, mejor dato, y
+  //           prueba por si mismo de que la cuenta es suya.
+  metodo String @default("OAUTH") // OAUTH | LOOKUP
+
+  // Cuando se comprobo que la cuenta es de este creador, poniendo un codigo
+  // en la biografia. Con OAUTH es implicito. Con LOOKUP hace falta, porque si
+  // no cualquiera podria dar de alta el @ de otro y cobrar por su audiencia.
+  ownershipVerifiedAt DateTime?
+
   // Credenciales de la conexion. Los tokens van cifrados (lib/secrets.js): son
   // la llave de la cuenta de otra persona, y una copia de seguridad de la base
   // no deberia ser una lista de accesos a cuentas ajenas.
@@ -503,9 +517,9 @@ model Payment {
   // respalda. SIMULATED existe para desarrollo y para que la aplicacion
   // funcione sin credenciales, pero la interfaz tiene que decirlo cuando lo
   // use: prometer una garantia que no existe es peor que no tenerla.
-  provider  String   @default("SIMULATED") // STRIPE | SIMULATED
+  provider       String   @default("SIMULATED") // STRIPE | SIMULATED
   // pi_... un cobro, tr_... una transferencia, re_... una devolucion.
-  stripeId  String?
+  stripeId       String?
   // Lo que Stripe cobra por el movimiento, EN CENTIMOS. Sale de nuestra
   // comision, no del creador: la empresa paga el precio acordado y el creador
   // recibe su 88% pase lo que pase.
@@ -515,9 +529,9 @@ model Payment {
   // cuentas al cabo de mil cobros. Nulo cuando todavia no se sabe: Stripe
   // tarda un instante en calcularla, y cero significaria "no costo nada".
   stripeFeeCents Int?
-  error     String?
-  reference String?
-  createdAt DateTime @default(now())
+  error          String?
+  reference      String?
+  createdAt      DateTime @default(now())
 }
 
 // ---------------------------------------------------------------------------

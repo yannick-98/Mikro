@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import clsx from 'clsx'
 import {
   AlertTriangle,
   CheckCircle2,
+  Copy,
   Link2,
   RefreshCw,
+  Search,
   ShieldCheck,
   Trash2,
   TrendingUp,
@@ -15,21 +16,29 @@ import { PlatformIcon, Spinner } from './ui'
 import { formatFollowers } from '../lib/format'
 
 /**
- * Conectar las cuentas de redes.
+ * Mis redes.
  *
- * Esta pantalla tiene una jerarquia deliberada: conectar primero, escribir a
- * mano despues y marcado como lo que es. No es una cuestion estetica. Un
- * creador que escribe sus propias cifras compite con otro que exagera las
- * suyas, y el que dice la verdad pierde; en cuanto conectar es lo facil y lo
- * declarado lleva una etiqueta, el incentivo se da la vuelta.
+ * El camino normal es el mas corto que existe: el creador escribe su @ y las
+ * cifras aparecen. No se le manda a ninguna pantalla de permisos, porque ahi
+ * se cae gente y se cae justo la que todavia no conoce la marca.
  *
- * Lo que se le promete al creador tiene que ser cierto: pedimos permiso de
- * solo lectura, no publicamos nada y se puede retirar cuando quiera. Eso esta
- * escrito aqui porque es la primera pregunta que se hace cualquiera al ver un
- * boton de "conectar con Instagram".
+ * Lo que no se puede saltar es el paso de despues. Escribir un @ no demuestra
+ * que sea tuyo, y aqui se cobra dinero por audiencia: hasta que el creador
+ * pega un codigo en su biografia, sus cifras las ve el y nadie mas. Esa
+ * pantalla es la amarilla de abajo, y esta escrita para que se entienda por
+ * que existe, no solo que hay que hacer.
+ *
+ * Conectar la cuenta de verdad sigue estando, en pequeno: da mejor dato y vale
+ * como prueba por si misma. Pero ya no es el peaje de entrada.
  */
 
 const NOMBRES = { instagram: 'Instagram', tiktok: 'TikTok', youtube: 'YouTube' }
+
+const EJEMPLO = {
+  instagram: '@tuusuario',
+  tiktok: '@tuusuario',
+  youtube: '@tucanal o el enlace de tu canal',
+}
 
 const fecha = (d) =>
   d
@@ -57,18 +66,125 @@ function Dato({ etiqueta, valor, sufijo }) {
   )
 }
 
-/** Una cuenta ya conectada, con lo que hemos medido de ella. */
-function CuentaConectada({ cuenta, onSync, onQuitar, ocupado }) {
-  const pocaMuestra = cuenta.postsAnalyzed > 0 && cuenta.postsAnalyzed < 3
+/**
+ * El paso de "demuestra que es tuya".
+ *
+ * Se explica el porque en una linea antes de pedir nada. Un codigo que hay
+ * que pegar en tu propia biografia sin saber para que parece un aro por el
+ * que saltar; sabiendo que es lo que impide que otro venda tus seguidores, es
+ * evidente.
+ */
+function Verificar({ platform, onHecho, show }) {
+  const [info, setInfo] = useState(null)
+  const [comprobando, setComprobando] = useState(false)
+
+  useEffect(() => {
+    let vivo = true
+    api
+      .socialOwnership(platform)
+      .then((d) => vivo && setInfo(d))
+      .catch(() => {})
+    return () => {
+      vivo = false
+    }
+  }, [platform])
+
+  const comprobar = async () => {
+    setComprobando(true)
+    try {
+      const r = await api.verifySocial(platform)
+      if (r.verificada) {
+        show?.success('Cuenta verificada. Tus cifras ya salen en tu perfil.')
+        onHecho?.()
+      } else {
+        show?.info(r.motivo || 'Todavía no encontramos el código.')
+      }
+    } catch (e) {
+      show?.error(e.message)
+    } finally {
+      setComprobando(false)
+    }
+  }
+
+  const copiar = () => {
+    navigator.clipboard?.writeText(info.codigo).then(
+      () => show?.success('Código copiado'),
+      () => {},
+    )
+  }
+
+  if (!info) return null
 
   return (
-    <div className="rounded-xl border border-emerald-200 bg-emerald-50/40 p-4">
+    <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3.5">
+      <p className="flex gap-2 text-[12.5px] font-bold text-amber-900">
+        <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+        Estas cifras solo las ves tú
+      </p>
+      <p className="mt-1.5 text-[12.5px] leading-relaxed text-amber-900/85">
+        Nos falta comprobar que la cuenta es tuya. Hasta entonces no aparece en tu perfil ni en las
+        búsquedas de las marcas: escribir un @ lo puede hacer cualquiera, y aquí se paga por
+        audiencia.
+      </p>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={copiar}
+          className="inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-white px-3 py-1.5 font-mono text-[13px] font-bold text-amber-900 transition hover:bg-amber-50"
+        >
+          {info.codigo} <Copy size={12} />
+        </button>
+        <span className="text-[12.5px] text-amber-900/85">Pégalo {info.donde} y guarda.</span>
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={comprobar}
+          disabled={comprobando}
+          className="btn-primary !bg-amber-900 hover:!bg-amber-950"
+        >
+          {comprobando ? <Spinner size={14} /> : <ShieldCheck size={14} />} Comprobar
+        </button>
+        <span className="text-[12px] text-amber-900/70">
+          Cuando salga verificada puedes quitarlo si quieres.
+        </span>
+      </div>
+    </div>
+  )
+}
+
+/** Una cuenta de la que ya traemos los datos. */
+function CuentaMedida({ cuenta, onSync, onQuitar, onCambio, ocupado, show }) {
+  const pocaMuestra = cuenta.postsAnalyzed > 0 && cuenta.postsAnalyzed < 3
+  const publica = cuenta.enElPerfil
+
+  return (
+    <div
+      className={
+        publica
+          ? 'rounded-xl border border-emerald-200 bg-emerald-50/40 p-4'
+          : 'rounded-xl border border-black/[0.08] p-4'
+      }
+    >
       <div className="flex flex-wrap items-center gap-3">
         <PlatformIcon platform={cuenta.platform} size={18} />
         <span className="text-[14px] font-extrabold">@{cuenta.handle}</span>
-        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[11.5px] font-bold text-emerald-800">
-          <ShieldCheck size={12} /> Comprobado
-        </span>
+        {publica ? (
+          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[11.5px] font-bold text-emerald-800">
+            <ShieldCheck size={12} /> Comprobado
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11.5px] font-bold text-amber-800">
+            Sin verificar
+          </span>
+        )}
+        {cuenta.metodo === 'OAUTH' ? (
+          <span className="rounded-full bg-black/[0.05] px-2 py-0.5 text-[11px] font-bold text-ink/50">
+            Cuenta conectada
+          </span>
+        ) : null}
         <span className="ml-auto flex items-center gap-1.5">
           <button
             type="button"
@@ -83,7 +199,7 @@ function CuentaConectada({ cuenta, onSync, onQuitar, ocupado }) {
             onClick={() => onQuitar(cuenta.platform)}
             className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] font-bold text-rose-600 transition hover:bg-rose-50"
           >
-            <Trash2 size={12} /> Desconectar
+            <Trash2 size={12} /> Quitar
           </button>
         </span>
       </div>
@@ -115,13 +231,19 @@ function CuentaConectada({ cuenta, onSync, onQuitar, ocupado }) {
           {cuenta.syncError}
         </p>
       ) : null}
+
+      {!publica ? (
+        <Verificar platform={cuenta.platform} onHecho={onCambio} show={show} />
+      ) : null}
     </div>
   )
 }
 
-/** Una cuenta que todavía no está conectada. */
-function CuentaPendiente({ platform, cuenta, estado, onConectar, onYoutube, ocupado }) {
-  const [canal, setCanal] = useState('')
+/** Una red de la que todavía no tenemos nada. */
+function Alta({ platform, cuenta, estado, onHandle, onConectar, ocupado }) {
+  const [valor, setValor] = useState('')
+  const porHandle = estado?.porHandle
+  const conOauth = estado?.modos?.includes('oauth')
 
   return (
     <div className="rounded-xl border border-black/[0.08] p-4">
@@ -135,51 +257,66 @@ function CuentaPendiente({ platform, cuenta, estado, onConectar, onYoutube, ocup
         ) : null}
       </div>
 
-      {!estado?.disponible ? (
-        <p className="mt-3 text-[12.5px] text-ink/45">
-          La conexión con {NOMBRES[platform]} todavía no está disponible. Mientras tanto puedes
-          poner tus cifras a mano, más abajo.
-        </p>
-      ) : platform === 'youtube' ? (
-        <form
-          className="mt-3 flex flex-wrap items-center gap-2"
-          onSubmit={(e) => {
-            e.preventDefault()
-            onYoutube(canal)
-          }}
-        >
-          <input
-            value={canal}
-            onChange={(e) => setCanal(e.target.value)}
-            placeholder="@tucanal o el enlace de tu canal"
-            className="field !mt-0 min-w-[220px] flex-1"
-          />
-          <button type="submit" disabled={ocupado || !canal.trim()} className="btn-primary">
-            {ocupado ? <Spinner size={14} /> : <Link2 size={14} />} Comprobar canal
-          </button>
-        </form>
-      ) : (
-        <div className="mt-3">
-          <button
-            type="button"
-            onClick={() => onConectar(platform)}
-            disabled={ocupado}
-            className="btn-primary"
+      {porHandle ? (
+        <>
+          <form
+            className="mt-3 flex flex-wrap items-center gap-2"
+            onSubmit={(e) => {
+              e.preventDefault()
+              onHandle(platform, valor)
+            }}
           >
-            {ocupado ? <Spinner size={14} /> : <Link2 size={14} />} Conectar {NOMBRES[platform]}
-          </button>
-        </div>
-      )}
-
-      {/* Sin boton no hay nada que explicar: la promesa de "solo lectura"
-          debajo de un aviso de "no disponible" solo confunde. */}
-      {estado?.disponible ? (
-        <p className="mt-2.5 text-[12px] text-ink/45">
-          {platform === 'youtube'
-            ? 'Tu canal es público: nos basta con saber cuál es. No te pedimos ninguna contraseña ni permiso.'
-            : 'Permiso de solo lectura. No publicamos nada en tu nombre y puedes retirarlo cuando quieras.'}
+            <input
+              value={valor}
+              onChange={(e) => setValor(e.target.value)}
+              placeholder={EJEMPLO[platform]}
+              className="field !mt-0 min-w-[220px] flex-1"
+            />
+            <button type="submit" disabled={ocupado || !valor.trim()} className="btn-primary">
+              {ocupado ? <Spinner size={14} /> : <Search size={14} />} Traer mis cifras
+            </button>
+          </form>
+          <p className="mt-2.5 text-[12px] text-ink/45">
+            No te pedimos contraseña ni permisos. Leemos lo que ya es público en tu perfil y
+            calculamos el engagement nosotros.
+            {conOauth ? (
+              <>
+                {' '}
+                <button
+                  type="button"
+                  onClick={() => onConectar(platform)}
+                  className="font-bold text-brand-600 underline decoration-brand-600/30 underline-offset-2 hover:decoration-brand-600"
+                >
+                  O conecta la cuenta
+                </button>{' '}
+                si prefieres que quede verificada de una vez.
+              </>
+            ) : null}
+          </p>
+        </>
+      ) : conOauth ? (
+        <>
+          <div className="mt-3">
+            <button
+              type="button"
+              onClick={() => onConectar(platform)}
+              disabled={ocupado}
+              className="btn-primary"
+            >
+              {ocupado ? <Spinner size={14} /> : <Link2 size={14} />} Conectar {NOMBRES[platform]}
+            </button>
+          </div>
+          <p className="mt-2.5 text-[12px] text-ink/45">
+            Permiso de solo lectura. No publicamos nada en tu nombre y puedes retirarlo cuando
+            quieras.
+          </p>
+        </>
+      ) : (
+        <p className="mt-3 text-[12.5px] text-ink/45">
+          Lo de {NOMBRES[platform]} todavía no está disponible. Mientras tanto puedes poner tus
+          cifras a mano, más abajo.
         </p>
-      ) : null}
+      )}
     </div>
   )
 }
@@ -220,6 +357,11 @@ export default function ConectarRedes({ onCambio, show }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  const refrescar = async () => {
+    await cargar()
+    onCambio?.()
+  }
+
   const conectar = async (platform) => {
     setOcupado(platform)
     try {
@@ -231,14 +373,14 @@ export default function ConectarRedes({ onCambio, show }) {
     }
   }
 
-  const conectarYoutube = async (canal) => {
-    setOcupado('youtube')
+  const darDeAlta = async (platform, handle) => {
+    setOcupado(platform)
     try {
-      const r = await api.connectYoutube(canal)
+      const r = await api.addSocialHandle(platform, handle)
       if (r.error) show?.error(r.error)
-      else show?.success('Canal comprobado. Ya tenemos tus cifras reales.')
-      await cargar()
-      onCambio?.()
+      else if (r.account?.enElPerfil) show?.success('Listo. Ya tenemos tus cifras reales.')
+      else show?.info('Cifras traídas. Falta un paso para que las vean las marcas.')
+      await refrescar()
     } catch (e) {
       show?.error(e.message)
     } finally {
@@ -252,8 +394,7 @@ export default function ConectarRedes({ onCambio, show }) {
       const r = await api.syncSocial(platform)
       if (r.ok) show?.success('Cifras actualizadas')
       else show?.error(r.error || 'No se pudieron actualizar')
-      await cargar()
-      onCambio?.()
+      await refrescar()
     } catch (e) {
       show?.error(e.message)
     } finally {
@@ -265,9 +406,8 @@ export default function ConectarRedes({ onCambio, show }) {
     setOcupado(platform)
     try {
       await api.disconnectSocial(platform)
-      show?.info('Cuenta desconectada. Hemos borrado lo que habíamos traído de ella.')
-      await cargar()
-      onCambio?.()
+      show?.info('Cuenta quitada. Hemos borrado lo que habíamos traído de ella.')
+      await refrescar()
     } catch (e) {
       show?.error(e.message)
     } finally {
@@ -293,9 +433,8 @@ export default function ConectarRedes({ onCambio, show }) {
         <div>
           <h2 className="text-[16px] font-extrabold tracking-tight">Mis redes</h2>
           <p className="mt-1 max-w-xl text-[13.5px] leading-relaxed text-ink/55">
-            Conecta tus cuentas y tus cifras las trae la propia plataforma. Un perfil comprobado
-            sube en el ranking y, sobre todo, convence: la marca sabe que el número no te lo has
-            puesto tú.
+            Dinos tu usuario y las cifras las traemos nosotros. Un perfil comprobado sube en el
+            ranking y, sobre todo, convence: la marca sabe que el número no te lo has puesto tú.
           </p>
         </div>
         {comprobado ? (
@@ -321,21 +460,23 @@ export default function ConectarRedes({ onCambio, show }) {
         {['instagram', 'tiktok', 'youtube'].map((p) => {
           const cuenta = porPlataforma[p]
           return cuenta?.source === 'CONNECTED' ? (
-            <CuentaConectada
+            <CuentaMedida
               key={p}
               cuenta={cuenta}
               onSync={sincronizar}
               onQuitar={quitar}
+              onCambio={refrescar}
               ocupado={ocupado === p}
+              show={show}
             />
           ) : (
-            <CuentaPendiente
+            <Alta
               key={p}
               platform={p}
               cuenta={cuenta}
               estado={estados[p]}
+              onHandle={darDeAlta}
               onConectar={conectar}
-              onYoutube={conectarYoutube}
               ocupado={ocupado === p}
             />
           )
@@ -353,8 +494,8 @@ export default function ConectarRedes({ onCambio, show }) {
       <p className="mt-4 flex gap-2 text-[12px] leading-relaxed text-ink/45">
         <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-ink/30" />
         Solo leemos lo que ya es público en tu perfil: seguidores, y los likes y comentarios de tus
-        últimas publicaciones. No vemos tus mensajes, no publicamos nada y, si desconectas, borramos
-        lo que habíamos traído.
+        últimas publicaciones. No vemos tus mensajes, no publicamos nada y, si quitas una cuenta,
+        borramos lo que habíamos traído.
       </p>
     </section>
   )

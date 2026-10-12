@@ -3,46 +3,132 @@
 > Las cifras de un creador dejan de ser lo que él escribe y pasan a ser lo que
 > dicen sus publicaciones.
 
-## Por qué no raspamos los perfiles
+## Dos caminos
 
-Es la primera pregunta y conviene contestarla antes que nada, porque raspar es
-más rápido de montar y parece lo obvio.
+| Camino | Qué hace el creador | Qué hace falta por nuestra parte |
+|---|---|---|
+| **Por el @** | Escribe su usuario. Nada más. | YouTube: una clave de API (gratis). Instagram y TikTok: un servicio de consulta (de pago) |
+| **Autorizando** | Pasa por la pantalla de permisos de la plataforma | App revisada en Meta / TikTok |
 
-1. **Va contra las condiciones** de Instagram, TikTok y YouTube. No es una
-   cuestión teórica: bloquean por IP y cierran cuentas de desarrollador.
-2. **Se rompe cada semana.** Un raspador depende del HTML de otro, que cambia
-   sin avisar y sin versiones. El día que se rompe, el ranking entero empieza a
-   decidirse con datos viejos y nadie se entera.
-3. **Y sobre todo, no resuelve el problema.** Desde fuera solo se ve lo que la
-   plataforma enseña a cualquiera, que es exactamente lo que se puede inflar
-   comprando seguidores y likes. Raspar no comprueba nada: copia el mismo
-   número que ya nos daba el creador, con más pasos.
+El camino normal es el primero, y la razón es de producto, no técnica: un
+creador que se registra tiene que salir de Mikro, entrar en Instagram, leer una
+pantalla que habla de «acceso a tu contenido» y volver. Ahí se cae gente, y la
+que se cae es justo la que todavía no conoce la marca. Autorizar sigue estando
+como paso opcional para quien quiera el sello completo de una vez.
 
-Conectar la cuenta es más trabajo y es lo único que permite decir «esto es
-real» sin mentir. Además deja la puerta abierta a métricas que no son públicas
-—alcance, guardados, audiencia— cuando haga falta.
+### Esto empezó al contrario
+
+Durante un tiempo este documento decía que raspar perfiles públicos era un
+error y daba tres razones. Conviene repasarlas una por una, porque dos siguen
+en pie y la tercera resultó estar mal.
+
+1. **«Va contra las condiciones de las plataformas.»** Sigue siendo verdad. La
+   diferencia es quién lo hace: el servicio de consulta, no nosotros. No es
+   una coartada —es una dependencia con un riesgo legal que se asume a
+   sabiendas— pero sí es la diferencia entre que nos bloqueen la IP y que se
+   la bloqueen a un proveedor que se dedica a eso.
+2. **«Se rompe cada semana.»** También. Lo que cambia es que lo arregla el
+   proveedor, y que cuando se rompe se ve: queda en `syncError` de la cuenta,
+   a la vista del creador, en vez de dejar el ranking decidiéndose en silencio
+   con datos viejos.
+3. **«Y sobre todo, no comprueba nada: copia el mismo número que ya nos daba
+   el creador.»** Esta era la razón de peso y estaba equivocada en la mitad
+   importante. Es cierto que un número de seguidores público se puede inflar
+   comprando seguidores — pero **eso también pasa autorizando**: la API oficial
+   de Instagram devuelve el mismo `followers_count` que ve cualquiera. OAuth
+   nunca hizo que los seguidores fueran menos comprables.
+
+   Lo que OAuth daba de verdad eran dos cosas distintas: **prueba de quién es
+   la cuenta**, y acceso a **métricas no públicas** (alcance, guardados,
+   audiencia). De la segunda nunca llegamos a usar nada: mirando
+   `providers/instagram.js`, lo que se pedía era seguidores, likes y
+   comentarios, que es exactamente lo que se ve desde fuera. Y la primera se
+   resuelve mucho más barato, con un código en la biografía.
+
+Conclusión: por el @ se pierde la puerta abierta a métricas privadas —que
+seguirá ahí el día que haga falta, porque el código de OAuth no se ha
+tirado— y no se pierde nada de lo que hoy se usa.
+
+## El @ no prueba de quién es la cuenta
+
+Este es el agujero del camino corto y no es menor: **cualquiera puede escribir
+el @ de otro**. En un directorio eso sería un dato mal puesto. Aquí una empresa
+paga 250 € por llegar a una audiencia, así que es venderle la audiencia de otra
+persona y cobrarla.
+
+El arreglo es el mismo truco con el que Google verifica dominios: se le da al
+creador un código, lo pega en su biografía y nosotros lo leemos. Ahí solo
+escribe quien tiene las llaves. Luego puede quitarlo; lo que queda guardado es
+la fecha en la que se comprobó.
+
+```
+POST /api/social/instagram/handle    -> trae las cifras (solo las ve él)
+GET  /api/social/instagram/propiedad -> el código y dónde pegarlo
+POST /api/social/instagram/verificar -> lo busca en la bio
+```
+
+**Mientras no esté verificada, la cuenta no sale al escaparate.** Ni en el
+perfil público, ni en las búsquedas de las marcas, ni en los agregados del
+creador (`cuentaParaElPerfil()`, en `social/propiedad.js`). El creador ve sus
+cifras reales desde el primer momento, que es lo que le engancha; lo que no
+puede es venderlas todavía.
+
+Autorizando no hace falta: entrar en una cuenta para darnos permiso sobre ella
+ya es la prueba. Por eso una cuenta por OAuth queda verificada sola.
+
+Cambiar de @ borra la verificación anterior. Lo comprobado era que la cuenta
+vieja era suya, no la nueva.
 
 ## Cómo funciona
 
 ```
-creador conecta  ->  token cifrado  ->  sync diario  ->  métricas recalculadas
-                                            |
-                                            +-> publicaciones guardadas
-                                            +-> foto del momento (histórico)
+creador da su @  ->  consulta al servicio  ->  métricas recalculadas
+                                                  |
+                                                  +-> publicaciones guardadas
+                                                  +-> foto del momento (histórico)
 ```
 
-| Plataforma | Cómo se conecta | Qué hace falta |
-|---|---|---|
-| **Instagram** | OAuth (*Instagram API with Instagram Login*) | App en Meta + revisión |
-| **TikTok** | OAuth (*Login Kit* + Display API) | App en TikTok + revisión |
-| **YouTube** | Solo el nombre del canal | Una clave de API. **Funciona el primer día** |
+Lo que **no** cambia según el camino: el engagement y la frecuencia los
+calculamos nosotros, en `metrics.js`, a partir de las publicaciones reales. El
+creador no escribe ninguna cifra en ningún sitio, y la detección de cifras
+infladas funciona igual con los datos de una consulta que con los de una
+cuenta autorizada.
 
-YouTube es la excepción porque los datos de un canal son públicos y basta una
-clave nuestra. El creador no tiene que autorizar nada. A cambio, eso comprueba
-sus cifras pero no su identidad: para lo segundo está `verificarPropiedad()`,
-que le pide poner un código en la descripción del canal, el mismo truco con el
-que Google verifica dominios y por la misma razón: ahí solo escribe quien tiene
-las llaves.
+## El servicio de consulta
+
+Instagram y TikTok no tienen API pública sin autorización, así que van por un
+servicio externo. Se elige por variable de entorno y lo que sale está
+normalizado, así que cambiarlo es escribir una función en `social/lookup.js` y
+no tocar nada más.
+
+```
+SOCIAL_LOOKUP_PROVIDER=apify     # si no se pone, se deduce de las credenciales
+APIFY_TOKEN=apify_api_...
+APIFY_ACTOR_INSTAGRAM=apify~instagram-profile-scraper   # opcional
+APIFY_ACTOR_TIKTOK=clockworks~tiktok-scraper            # opcional
+```
+
+Sin ninguna credencial, Instagram y TikTok simplemente no ofrecen el camino
+del @: la pantalla dice que no está disponible, en vez de un botón que lleva a
+un error. YouTube sigue funcionando, porque su API es oficial y gratis.
+
+### Esto se paga por consulta, y eso cambia el diseño
+
+No es una API gratis, y la factura crece con el número de creadores, no con el
+uso. De ahí dos decisiones que de otro modo parecerían arbitrarias:
+
+- **Una consulta por sincronización, no dos.** Sincronizar pide el perfil y
+  luego las publicaciones, y en estos servicios las dos cosas vienen de la
+  misma consulta cobrada. Hay un caché de un minuto en `lookup.js` cuyo único
+  trabajo es que esas dos llamadas no se paguen por separado.
+- **Tres días en vez de uno.** Las cuentas por @ de Instagram y TikTok se
+  refrescan cada 72 h; las demás, cada 24 h. Los seguidores de alguien no
+  cambian lo suficiente en un día para pagar por verlo: con mil creadores, la
+  diferencia entre un día y tres son dos tercios de la factura por un dato
+  que nadie habría notado.
+
+Orden de magnitud para dimensionarlo: mil creadores con dos cuentas cada uno,
+refrescadas cada tres días, son unas 20.000 consultas al mes.
 
 ## Las cifras se recalculan, no se copian
 
@@ -105,7 +191,24 @@ registra el titular de la cuenta.
 
 Con esto ya funciona la verificación de canales de YouTube, sin más trámites.
 
-### 2. Instagram
+### 2. El servicio de consulta — lo que abre Instagram y TikTok por el @
+
+Es lo que más desbloquea por lo que menos cuesta: con esto, las tres redes
+funcionan con solo el @ y no hace falta ninguna app revisada.
+
+1. Crear cuenta en [Apify](https://apify.com/). Tiene capa gratuita, así que se
+   puede probar antes de poner una tarjeta.
+2. Settings → Integrations → **API token**.
+3. `APIFY_TOKEN=...` en el `.env` y en Netlify (como secreto).
+
+Comprobarlo con un perfil cualquiera desde el panel del creador: si vuelven
+seguidores y publicaciones, está listo.
+
+Si más adelante interesa otro proveedor —hay servicios que además dan datos de
+audiencia, que es algo que una marca paga— el sitio donde se cambia es
+`social/lookup.js`, y es una función.
+
+### 3. Instagram (opcional)
 
 1. [Meta for Developers](https://developers.facebook.com/) → crear app de tipo
    **Business**.
@@ -120,7 +223,7 @@ El token largo dura 60 días y se renueva solo mientras se use. Si un creador
 no entra en dos meses, caduca y hay que pedirle permiso otra vez: `sync` lo
 anota en `syncError` en vez de borrar nada.
 
-### 3. TikTok
+### 4. TikTok (opcional)
 
 1. [TikTok for Developers](https://developers.tiktok.com/) → crear app.
 2. Productos: **Login Kit** y **Display API**.
@@ -133,7 +236,7 @@ anota en `syncError` en vez de borrar nada.
 El token dura 24 h y el de refresco un año, así que renovar es lo normal en
 cada sincronización, no un caso excepcional.
 
-### 4. Avisos por WhatsApp (opcional)
+### 5. Avisos por WhatsApp (opcional)
 
 Requiere WhatsApp Business Platform (Cloud API) y una plantilla aprobada por
 Meta, porque fuera de la ventana de 24 h solo se pueden mandar plantillas y
@@ -153,7 +256,7 @@ aplicación.
 ```bash
 npm run social:sync                  # las que lleven más de 24 h sin actualizar
 npm run social:sync -- --horas 6
-npm run test:social                  # 39 pruebas, sin red ni base de datos
+npm run test:social                  # 102 pruebas, sin red ni base de datos
 ```
 
 Conviene dejarlo en una tarea diaria. Las cifras envejecen: un engagement de
@@ -166,13 +269,13 @@ El peso de «confianza» (8 %) deja de ser un sí/no de identidad verificada:
 
 | Situación | Puntos |
 |---|---|
-| Redes conectadas **e** identidad verificada | 100 |
-| Redes conectadas | 85 |
+| Cifras comprobadas **e** identidad verificada | 100 |
+| Cifras comprobadas | 85 |
 | Solo identidad verificada | 70 |
 | Nada | 40 |
 
 Las cifras pesan más que la identidad porque lo que una marca contrata son las
-cifras, y las que vienen de la plataforma no se pueden inflar. Está declarado
+cifras, y las que calculamos de las publicaciones no las ha escrito nadie. Está declarado
 en la política de privacidad, como exige el RGPD para una decisión
 automatizada.
 
@@ -180,8 +283,10 @@ automatizada.
 
 - Alcance e impresiones de Instagram: hace falta pasar la revisión de
   `instagram_business_manage_insights`.
-- Datos de audiencia (edad, sexo, ciudad) desde las plataformas, que ahora son
-  declarados.
+- Datos de audiencia (edad, sexo, ciudad), que ahora son declarados. Con el
+  camino del @ hay un atajo que antes no existía: hay servicios de consulta
+  que los incluyen, y el sitio donde se enchufaría es el mismo
+  `social/lookup.js`.
 - Mostrar la evolución de seguidores en el perfil: los `SocialSnapshot` ya se
   guardan, falta pintarlos.
 
