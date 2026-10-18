@@ -339,6 +339,17 @@ const { clasificarFallo } = await import('../src/web/traer.js')
 check('el codigo viaja con el fallo', clasificarFallo({ cause: { code: 'ECONNRESET' } }).codigo === 'ECONNRESET')
 check('y tambien cuando solo hay nombre', clasificarFallo({ name: 'TimeoutError' }).codigo === 'TimeoutError')
 check('un error pelado no inventa codigo', clasificarFallo(new Error('vaya')).codigo === 'Error')
+// El que nos dio telepizza.es desde la funcion desplegada: la conexion se
+// abre y la cortan. No es lo mismo que un servidor caido y no se mira en el
+// mismo sitio.
+const cortada = clasificarFallo({ cause: { code: 'UND_ERR_SOCKET' } })
+check('una conexion cortada tiene su propio tipo', cortada.tipo === 'cortada', cortada.tipo)
+check('y se cuenta sin tecnicismos', cortada.mensaje.includes('se corta enseguida'))
+check('pero conserva el codigo', cortada.codigo === 'UND_ERR_SOCKET')
+check(
+  'y lleva la salvedad del centro de datos',
+  informeDeFallo({ url: 'https://x.es/', fallo: cortada }).advertencias.some((a) => a.includes('centro de datos')),
+)
 check('el informe lo enseña', fallo.advertencias.some((a) => a.includes('ENOTFOUND')))
 
 // Y la salvedad que evita el susto: preguntamos desde un centro de datos.

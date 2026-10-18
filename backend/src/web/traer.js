@@ -224,6 +224,14 @@ export function clasificarFallo(e) {
   if (codigo === 'ECONNREFUSED' || codigo === 'ECONNRESET') {
     return con({ tipo: 'caida', mensaje: 'El servidor ha rechazado la conexión' })
   }
+  // La conexion se abre y el otro extremo la corta antes de contestar. Es la
+  // firma de un filtro de borde que descarta por IP o por la huella de quien
+  // llama; lo vimos contra una cadena espanola que desde un portatil carga
+  // sin pestanear. Separarlo del «no hemos podido conectar» generico importa
+  // porque el sitio donde hay que mirar es otro.
+  if (codigo === 'UND_ERR_SOCKET' || codigo === 'EPIPE' || codigo === 'ECONNABORTED') {
+    return con({ tipo: 'cortada', mensaje: 'La conexión se abre y se corta enseguida, sin llegar a contestar' })
+  }
   if (codigo === 'CERT_HAS_EXPIRED') {
     return con({ tipo: 'certificado', mensaje: 'El certificado de seguridad ha caducado: el navegador avisa de web no segura' })
   }

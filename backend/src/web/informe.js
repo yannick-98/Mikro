@@ -175,7 +175,7 @@ export function informeDeFallo({ url, fallo, estado, redirecciones = [] }) {
       // desde el movil carga, el problema no es la web: es a quien deja
       // entrar. Decirlo evita que alguien salga de aqui pensando que tiene
       // la web caida cuando sus clientes la ven perfectamente.
-      ...(fallo.tipo === 'desconocido' || fallo.tipo === 'caida' || fallo.tipo === 'lenta'
+      ...(['desconocido', 'caida', 'lenta', 'cortada'].includes(fallo.tipo)
         ? ['Preguntamos desde un centro de datos, no desde una conexión doméstica. Ábrela tú en el móvil con los datos: si carga, lo que falla no es tu web sino lo que deja pasar, y eso afecta también a las herramientas de análisis y a los robots que generan la vista previa de tus enlaces.']
         : []),
       ...(fallo.codigo ? [`Detalle técnico, para quien lleve la web: ${fallo.codigo}.`] : []),
