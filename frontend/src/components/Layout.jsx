@@ -10,6 +10,9 @@ import { formatRelative } from '../lib/format'
 const NAV = [
   { to: '/descubrir', label: 'Descubrir' },
   { to: '/rankings', label: 'Rankings' },
+  // Va en el menu principal porque es lo unico util que damos sin pedir
+  // cuenta: es la puerta por la que entra una pyme que no nos conoce.
+  { to: '/analisis-web', label: 'Analiza tu web' },
   { to: '/recursos', label: 'Recursos' },
 ]
 
@@ -317,6 +320,7 @@ export function Footer() {
       title: 'Recursos',
       links: [
         { to: '/recursos', label: 'Guias y plantillas' },
+        { to: '/analisis-web', label: 'Analiza tu web gratis' },
         { to: '/recursos#precios', label: 'Tarifas orientativas' },
         { to: '/recursos#legal', label: 'Publicidad y ley' },
         { to: '/recursos#faq', label: 'Preguntas frecuentes' },

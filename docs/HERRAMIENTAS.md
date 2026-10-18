@@ -4,6 +4,12 @@ Cuatro cosas que convierten datos que Mikro ya tenía y nadie usaba en una
 respuesta que hoy el usuario no sabe buscar, más dos que quitan fricción
 donde se cae la gente.
 
+> El **diagnóstico de web** (`/analisis-web`) es la excepción y por eso tiene
+> documento propio: `docs/ANALISIS-WEB.md`. No convierte datos nuestros, sale
+> a internet a buscarlos, y de ahí le vienen sus tres problemas —que no nos
+> usen de escáner, que una web lenta no nos tumbe la función y que el mismo
+> análisis no se repita cien veces.
+
 ---
 
 ## 1. Precio de referencia

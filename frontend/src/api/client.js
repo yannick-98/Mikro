@@ -143,6 +143,12 @@ export const api = {
   briefQuestions: () => request('/brief/questions'),
   writeBrief: (payload) => request('/brief', { method: 'POST', body: payload }),
   mediaKit: (handle) => request(`/mediakit/${handle}`),
+
+  // Diagnostico de web. Por POST para que la direccion no acabe en los logs
+  // de acceso de cada intermediario; el GET existe en el API para que un
+  // informe se pueda enlazar, pero desde aqui no hace falta.
+  analizarWeb: (url) => request('/web/analisis', { method: 'POST', body: { url } }),
+  analizarMiWeb: () => request('/web/analisis/mia'),
   issueInvoices: (dealId) => request(`/deals/${dealId}/invoices`, { method: 'POST' }),
 
   // Cobros

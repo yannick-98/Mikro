@@ -66,6 +66,13 @@ npm run seed
 Regenera los datos de demostración (borra y vuelve a crear todo).
 
 ```bash
+npm run web:analizar -- tupanaderia.es
+```
+
+Diagnóstico de una web real desde la terminal: el mismo informe que da
+`/analisis-web`, en texto plano. Con `--json`, en crudo.
+
+```bash
 npm run smoke
 ```
 
@@ -131,6 +138,10 @@ esa variable.
   valoraciones de marcas.
 - Páginas para empresas, para creadores y de recursos (guías, tarifas de referencia y
   obligaciones legales de la publicidad).
+- **Diagnóstico de web** (`/analisis-web`): una pyme escribe su dirección y recibe un
+  informe del estado de su web —46 comprobaciones en seis áreas, nota, prioridades
+  ordenadas por lo que recupera cada arreglo y la respuesta a si esa web aguanta el
+  tráfico de una campaña. Sin cuenta. Ver `docs/ANALISIS-WEB.md`.
 
 **Empresa**
 - Panel con campañas, candidaturas pendientes, gasto y alcance contratado.

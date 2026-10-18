@@ -185,6 +185,32 @@ una acción fuera de orden devuelve 400 y una ejecutada por quien no corresponde
 
 ---
 
+## Diagnóstico de web
+
+| Método | Ruta | Rol | Descripción |
+|---|---|---|---|
+| POST | `/web/analisis` | público | Informe del estado de una web: `{ url }`. 46 comprobaciones en seis áreas, nota, prioridades y lo que no se ha podido mirar. |
+| GET | `/web/analisis?url=` | público | El mismo informe, enlazable y cacheable en el CDN media hora. |
+| GET | `/web/analisis.txt?url=` | público | En texto plano, para reenviarlo por correo o WhatsApp a quien lleve la web. |
+| GET | `/web/analisis/mia` | BRAND | La web que la empresa puso en su perfil. 400 si no la ha puesto. |
+
+Seis análisis cada diez minutos por IP: pasado ese límite se devuelve **429**
+con el tiempo que falta. La ruta sale a internet (seis peticiones por
+análisis), así que sin freno cualquiera con un bucle convierte la función en un
+escáner de webs ajenas con nuestra IP.
+
+Se rechazan con **400** las direcciones que no son públicas: `localhost`, IPs
+privadas, puertos distintos de 80 y 443, esquemas que no sean http(s) y
+`usuario:clave@`. La comprobación se hace sobre las IPs que resuelve el DNS, no
+sobre el nombre, y se repite en cada redirección.
+
+Cuando lo que contesta esa dirección no es una web —un muro antibots, un
+dominio aparcado, un «en construcción»— el informe llega con `muro` y **sin
+nota**: no se puntúa lo que no se ha visto. Detalle completo en
+`docs/ANALISIS-WEB.md`.
+
+---
+
 ## Peticiones de demo
 
 | Método | Ruta | Rol | Descripción |

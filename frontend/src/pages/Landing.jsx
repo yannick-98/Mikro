@@ -38,6 +38,11 @@ function Header() {
           <a href="#empresas" className="hidden rounded-xl px-3 py-2.5 text-[14px] font-semibold text-white/75 transition-colors hover:text-white sm:block">
             Para empresas
           </a>
+          {/* Lo unico util que damos sin pedir cuenta: para una pyme que
+              aterriza aqui sin saber que somos, es la puerta de entrada. */}
+          <Link to="/analisis-web" className="hidden rounded-xl px-3 py-2.5 text-[14px] font-semibold text-white/75 transition-colors hover:text-white md:block">
+            Analiza tu web
+          </Link>
           <Link to="/entrar" className="rounded-xl px-3 py-2.5 text-[14px] font-semibold text-white/75 transition-colors hover:text-white">
             Entrar
           </Link>

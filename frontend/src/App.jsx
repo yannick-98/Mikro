@@ -8,6 +8,7 @@ import Discover from './pages/Discover'
 import Rankings from './pages/Rankings'
 import CreatorProfile from './pages/CreatorProfile'
 import Resources from './pages/Resources'
+import WebCheck from './pages/WebCheck'
 import MediaKit from './pages/MediaKit'
 import Login from './pages/Login'
 import Register from './pages/Register'
@@ -85,6 +86,10 @@ export default function App() {
         <Route path="/" element={<Entrada />} />
         <Route path="/rankings" element={<Rankings />} />
         <Route path="/recursos" element={<Resources />} />
+        {/* El diagnostico de web es publico y sin cuenta a proposito: es lo
+            que le damos a una pyme antes de pedirle nada, y la direccion
+            viaja en la URL para que el informe se pueda reenviar. */}
+        <Route path="/analisis-web" element={<WebCheck />} />
         {/* El media kit es publico a proposito: se pega en una bio de
             Instagram y lo abre quien no tiene cuenta. Es la carta de
             presentacion del creador y, de paso, nuestra mejor captacion. */}

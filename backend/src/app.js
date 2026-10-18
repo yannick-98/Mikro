@@ -16,6 +16,7 @@ import rankingRoutes from './routes/rankings.js'
 import demoRoutes from './routes/demos.js'
 import socialRoutes from './routes/social.js'
 import toolRoutes from './routes/tools.js'
+import webRoutes from './routes/web.js'
 import shopifyRoutes from './routes/shopify.js'
 import shopifyWebhookRoutes from './routes/shopifyWebhooks.js'
 import stripeRoutes from './routes/stripe.js'
@@ -74,6 +75,9 @@ export function createApp() {
   // Herramientas: precio de referencia, informe, brief y media kit. Montadas
   // en la raiz porque cada una cuelga de donde le corresponde por recurso.
   app.use('/api', router(toolRoutes))
+  // El diagnostico de web va aparte: es la unica ruta que sale a internet a
+  // buscar datos que no son nuestros, y por eso tiene su propio freno.
+  app.use('/api/web', router(webRoutes))
   app.use('/api/shopify', router(shopifyRoutes))
   app.use('/api', router(miscRoutes))
 
