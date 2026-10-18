@@ -254,7 +254,14 @@ export default function WebCheck() {
                   <h2 className={clsx('mt-2 text-[21px] font-black leading-tight', sem.texto)}>
                     {informe.campana.titular}
                   </h2>
-                  <p className="mt-2 max-w-xl text-[14px] leading-relaxed text-ink/70">{informe.campana.texto}</p>
+                  {/* El veredicto puede venir en varios párrafos (cuando no
+                      hemos podido ver la web, lo que averiguamos aparte va en
+                      el suyo). Un solo <p> los pegaría en un ladrillo. */}
+                  {informe.campana.texto.split('\n\n').map((parrafo) => (
+                    <p key={parrafo.slice(0, 40)} className="mt-2 max-w-xl text-[14px] leading-relaxed text-ink/70">
+                      {parrafo}
+                    </p>
+                  ))}
                 </div>
                 <Nota nota={informe.nota} />
               </div>

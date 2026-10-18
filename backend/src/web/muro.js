@@ -73,10 +73,30 @@ export function detectarMuro({ html = '', cabeceras = {}, estado = 200, pagina }
   if (huella && (sospechosa || frase || bloqueada)) {
     return { clase: 'bloqueo', tipo: huella.id, nombre: huella.nombre, estado }
   }
-  if ((frase || bloqueada) && sospechosa) {
+  // Para decir «hay un antibots» hace falta la huella o la frase. Un codigo
+  // de error a secas no lo demuestra: un 429 es casi siempre una web
+  // ocupada, y un 403 puede ser una carpeta mal configurada. Antes bastaba
+  // el codigo, y el resultado fue acusar de tener un muro a una tienda que
+  // solo estaba pidiendo que esperaramos un minuto.
+  if (frase && sospechosa) {
     return { clase: 'bloqueo', tipo: 'desconocido', nombre: 'un sistema de protección', estado }
   }
   return null
+}
+
+/**
+ * ¿Nos esta pidiendo que volvamos luego?
+ *
+ * Un 429 (o un 503 con `Retry-After`) no es un fallo de la web ni una
+ * defensa contra robots: es «ahora no puedo, vuelve en un minuto». Lo
+ * honrado es decir eso y no puntuar, porque muy probablemente en el
+ * siguiente intento salga un informe normal.
+ */
+export function detectarOcupada({ cabeceras = {}, estado = 200 }) {
+  if (estado !== 429 && estado !== 503) return null
+  const cabecera = cabeceras['retry-after']
+  const espera = /^\d+$/.test(String(cabecera || '').trim()) ? Number(cabecera) : null
+  return { clase: 'ocupada', tipo: String(estado), nombre: 'una página de «demasiadas peticiones»', estado, espera }
 }
 
 /** ¿Lo que hay en esa direccion es un sustituto de web? */
@@ -87,8 +107,31 @@ export function detectarSustituta({ html = '', estado = 200, pagina }) {
   return encontrada ? { clase: encontrada.clase, tipo: encontrada.clase, nombre: encontrada.nombre, estado } : null
 }
 
-/** Las dos preguntas de una vez: lo que hemos descargado, ¿es su web? */
-export const queNosHanDado = (datos) => detectarMuro(datos) || detectarSustituta(datos)
+/**
+ * Los robots que generan la tarjeta de un enlace compartido.
+ *
+ * Esto nacio de una tienda real que nos contestaba 429 y a Chrome 200. En vez
+ * de dejarlo en «no hemos podido verla», se le pregunta lo mismo con la cara
+ * de los robots que de verdad le importan: resulto que el de Meta —el que
+ * dibuja la vista previa en Instagram y en Facebook— se comia el mismo
+ * rechazo. Para una tienda que va a trabajar con creadores, eso no es un
+ * detalle tecnico: es que el enlace que publique el creador puede salir sin
+ * imagen, sin titulo y sin nada en lo que pulsar.
+ *
+ * Se consultan solo cuando ya nos han bloqueado: son dos peticiones de mas
+ * en el unico caso en el que, si no, no tendriamos nada que contar.
+ */
+export const AGENTES_PREVIA = [
+  {
+    id: 'meta',
+    nombre: 'Instagram y Facebook',
+    agente: 'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)',
+  },
+  { id: 'whatsapp', nombre: 'WhatsApp', agente: 'WhatsApp/2.23.20.0 A' },
+]
+
+/** Las tres preguntas de una vez: lo que hemos descargado, ¿es su web? */
+export const queNosHanDado = (datos) => detectarMuro(datos) || detectarOcupada(datos) || detectarSustituta(datos)
 
 /** Lo que se le cuenta a quien esperaba un informe y no lo va a tener. */
 const TEXTOS = {
@@ -99,6 +142,14 @@ const TEXTOS = {
       'Merece la pena que lo compruebes igualmente: lo que nos bloquea a nosotros bloquea también a muchas herramientas de análisis y, mal configurado, a veces al propio Google. ' +
       'En Search Console, «Inspección de URLs» te dice en un minuto si a Google le pasa lo mismo.',
     arreglo: 'Pide a quien lleve la web que permita el paso al agente «MikroBot», o vuelve a intentarlo desde otra conexión.',
+  }),
+  ocupada: (m) => ({
+    titular: 'Tu web nos ha pedido que esperemos.',
+    texto:
+      `Ha contestado con un ${m.estado}: «demasiadas peticiones». No es un fallo tuyo ni un informe malo, es que en este momento no nos atiende` +
+      `${m.espera ? `, y nos pide ${m.espera} segundos` : ''}. Vuelve a intentarlo dentro de un rato y lo más probable es que salga el informe entero. ` +
+      'Si te pasa siempre, entonces sí importa: lo que nos frena a nosotros frena también a Google cuando pasa a rastrearte.',
+    arreglo: 'Si se repite, pregunta a tu hosting si tienes un límite de peticiones demasiado estrecho.',
   }),
   aparcado: () => ({
     titular: 'En esa dirección no hay una web: hay una página de dominio en venta.',
@@ -126,21 +177,59 @@ const TEXTOS = {
  *
  * No lleva nota. Poner un numero aqui seria calificar la pagina de otro.
  */
-export function informeSinWeb({ url, muro, redirecciones = [] }) {
+export function informeSinWeb({ url, muro, redirecciones = [], previsualizadores = [] }) {
   const { titular, texto, arreglo } = (TEXTOS[muro.clase] || TEXTOS.bloqueo)(muro)
+  const rechazados = previsualizadores.filter((p) => !p.ok)
+  const admitidos = previsualizadores.filter((p) => p.ok)
+
+  // Lo unico accionable que podemos sacar de aqui, y vale mas que el resto
+  // del informe que no hemos podido hacer: si lo que nos rechaza rechaza
+  // tambien al robot que dibuja la tarjeta de un enlace compartido, el
+  // trabajo del creador sale en gris.
+  const aviso = rechazados.length
+    ? `Hemos vuelto a preguntar con la cara de los robots que dibujan la vista previa de un enlace compartido, y en este intento la de ${rechazados
+        .map((p) => p.nombre)
+        .join(' y la de ')} ha recibido el mismo rechazo${
+        admitidos.length ? `, mientras que la de ${admitidos.map((p) => p.nombre).join(' y la de ')} ha pasado` : ''
+      }. Si se repite, cuando un creador comparta tu enlace ahí saldrá un rectángulo gris sin imagen ni título: justo el soporte por el que habrías pagado. Compruébalo tú con el depurador de enlaces de Meta, que te lo dice en un minuto y sin ambigüedad.`
+    : null
+
   return {
     analizadaEl: new Date().toISOString(),
-    ficha: { url, estado: muro.estado ?? null, saltos: redirecciones.length, plataforma: muro.nombre },
+    // Sin `plataforma`: lo que hemos visto es la pagina de otro, y la ficha
+    // solo lleva lo que sabemos de la web de quien pregunta. El titular ya
+    // dice con qué nos hemos topado.
+    ficha: { url, estado: muro.estado ?? null, saltos: redirecciones.length },
     nota: { total: null, letra: null, veredicto: null },
     muro,
-    campana: { semaforo: muro.clase === 'bloqueo' ? 'reparos' : 'no', titular, texto, bloqueos: [] },
+    previsualizadores,
+    // Ni el muro ni el «vuelve luego» dicen nada de la web: no son un «no»,
+    // son un «no lo sabemos». Un dominio aparcado si es un no rotundo.
+    //
+    // Que un previsualizador se lleve un rechazo no sube el semaforo a rojo,
+    // y eso es deliberado: lo hemos visto **una vez**. Probandolo contra una
+    // tienda real, el mismo robot recibio un 429 en un intento y un 200 dos
+    // minutos despues. Una observacion no es un veredicto; se cuenta lo
+    // observado y se manda a comprobarlo donde se comprueba de verdad.
+    campana: {
+      semaforo: muro.clase === 'bloqueo' || muro.clase === 'ocupada' ? 'reparos' : 'no',
+      titular,
+      texto: aviso ? `${texto}\n\n${aviso}` : texto,
+      bloqueos: rechazados.map((p) => ({ id: `previa-${p.id}`, titulo: `Vista previa en ${p.nombre}` })),
+    },
     prioridades: [],
     bienHecho: [],
     areas: [],
     sinMirar: [],
-    advertencias: [`Lo que hemos descargado es ${muro.nombre}, no tu web.`, arreglo],
+    advertencias: [
+      `Lo que hemos descargado es ${muro.nombre}, no tu web.`,
+      ...(rechazados.length
+        ? ['Quien lleve la web tiene que dejar pasar a los robots de vista previa (facebookexternalhit, WhatsApp, Twitterbot). No son rastreadores que te cuesten dinero: son los que enseñan tu tarjeta cuando alguien te comparte.']
+        : []),
+      arreglo,
+    ],
     resumen: { fallos: 0, avisos: 0, correctas: 0, sinMirar: 0 },
   }
 }
 
-export default { detectarMuro, detectarSustituta, queNosHanDado, informeSinWeb }
+export default { detectarMuro, detectarOcupada, detectarSustituta, queNosHanDado, informeSinWeb, AGENTES_PREVIA }

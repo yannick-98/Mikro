@@ -347,7 +347,7 @@ const mirar = (html, cabeceras = {}, estado = 200) =>
 
 const muro = mirar(MURO, { 'cf-ray': 'x' })
 check('reconoce el muro de Cloudflare', muro?.tipo === 'cloudflare', JSON.stringify(muro))
-check('un 403 escueto tambien cuenta', mirar('<html><body>Access Denied</body></html>', {}, 403)?.clase === 'bloqueo')
+check('un «access denied» escueto tambien cuenta', mirar('<html><body>Access Denied</body></html>', {}, 403)?.clase === 'bloqueo')
 // Y lo contrario: media internet esta detras de Cloudflare y sirve su web
 // perfectamente. La huella sola no puede bastar.
 check('una web buena detras de Cloudflare no es un muro', mirar(BUENA, { 'cf-ray': 'x', server: 'cloudflare' }) === null)
@@ -364,6 +364,53 @@ check('no se inventa una nota', infMuro.nota.total === null)
 check('dice quien nos ha parado', infMuro.campana.titular.includes('Cloudflare'))
 check('y avisa de que puede estar echando a Google', infMuro.campana.texto.includes('Google'))
 check('el texto plano tampoco finge un informe', informeEnTexto(infMuro).includes('NO HEMOS PODIDO VERLA'))
+
+// El tercer caso real: una tienda contesto 429 «Too many requests» con
+// Retry-After: 60. No es un muro antibots, es una web ocupada, y llamarlo
+// sistema de proteccion mandaba a su dueno a buscar un problema que no tiene.
+const TOO_MANY = '<!doctype html><html lang="en"><head><title>Too many requests</title></head><body class="status-code-429"><div><h1>Too many requests</h1><p>You have sent too many requests. Try again soon.</p></div></body></html>'
+const ocupada = mirar(TOO_MANY, { 'retry-after': '60', server: 'cloudflare' }, 429)
+check('un 429 es una web ocupada, no un muro', ocupada?.clase === 'ocupada', JSON.stringify(ocupada))
+check('y se queda con los segundos que pide', ocupada?.espera === 60)
+check('un 403 pelado ya no se acusa de tener antibots', mirar('<html><body><h1>Forbidden</h1></body></html>', {}, 403) === null)
+check('un 503 sin Retry-After sigue siendo una web ocupada', mirar('<html><body>No disponible</body></html>', {}, 503)?.espera === null)
+// Y lo de siempre: con huella de antibots, el 429 si es un muro.
+check('un 429 con huella de Cloudflare sí es un muro', mirar(MURO, { 'cf-ray': 'x' }, 429)?.clase === 'bloqueo')
+
+const infOcupada = informeSinWeb({ url: 'https://tienda.es/', muro: ocupada })
+check('lo cuenta como «vuelve luego»', infOcupada.campana.titular.includes('esperemos'))
+check('dice los segundos que pidió', infOcupada.campana.texto.includes('60 segundos'))
+check('no lo presenta como un veredicto sobre la web', infOcupada.campana.semaforo === 'reparos')
+check('y no se inventa una nota', infOcupada.nota.total === null)
+
+// Y lo que de verdad rescata el caso: si lo que nos rechaza rechaza tambien
+// al robot que dibuja la tarjeta del enlace, eso vale mas que el informe que
+// no hemos podido hacer.
+const conPrevia = informeSinWeb({
+  url: 'https://tienda.es/',
+  muro: ocupada,
+  previsualizadores: [
+    { id: 'meta', nombre: 'Instagram y Facebook', ok: false, estado: 429 },
+    { id: 'whatsapp', nombre: 'WhatsApp', ok: true, estado: 200 },
+  ],
+})
+check('avisa de que la vista previa se cae', conPrevia.campana.texto.includes('rectángulo gris'))
+check('nombra a quién rechaza', conPrevia.campana.texto.includes('Instagram y Facebook'))
+check('y a quién sí deja pasar', conPrevia.campana.texto.includes('WhatsApp'))
+// Una sola observacion no es un veredicto: el mismo robot recibio un 429 y,
+// dos minutos despues, un 200. Se cuenta lo visto y se manda a comprobarlo.
+check('lo presenta como lo que es, un intento', conPrevia.campana.texto.includes('en este intento'))
+check('no lo convierte en un veredicto', conPrevia.campana.semaforo === 'reparos')
+check('y manda a comprobarlo donde se comprueba', conPrevia.campana.texto.includes('depurador de enlaces'))
+check('dice qué hay que pedir', conPrevia.advertencias.some((a) => a.includes('facebookexternalhit')))
+check(
+  'si los previsualizadores pasan, no se inventa el aviso',
+  !informeSinWeb({
+    url: 'https://tienda.es/',
+    muro: ocupada,
+    previsualizadores: [{ id: 'meta', nombre: 'Instagram y Facebook', ok: true, estado: 200 }],
+  }).campana.texto.includes('rectángulo gris'),
+)
 
 const infAparcado = informeSinWeb({ url: 'https://tienda.es/', muro: aparcado })
 check('el dominio aparcado se cuenta como lo que es', infAparcado.campana.titular.includes('en venta'))

@@ -21,7 +21,7 @@ import {
   etiquetas, jsonLd, metas, textoVisible, dominio,
 } from './html.js'
 import { reconocer } from './huellas.js'
-import { queNosHanDado } from './muro.js'
+import { AGENTES_PREVIA, queNosHanDado } from './muro.js'
 import { normalizar } from './seguridad.js'
 import { traer } from './traer.js'
 
@@ -176,9 +176,27 @@ const intento = async (url, opciones) => {
  * el primer dato del informe, y seguramente el mas importante que esa empresa
  * va a leer hoy.
  */
+/** Lo que pide esperar una web que contesta 429, si lo dice en segundos. */
+const esperaPedida = (respuesta) => {
+  if (respuesta?.estado !== 429 && respuesta?.estado !== 503) return null
+  const c = String(respuesta.cabeceras?.['retry-after'] || '').trim()
+  return /^\d+$/.test(c) ? Number(c) : null
+}
+
 export async function recoger(entrada) {
   const url = normalizar(entrada)
-  const principal = await traer(url)
+  let principal = await traer(url)
+
+  // Si la web pide esperar poco, se espera y se vuelve a intentar una vez.
+  // Un «vuelve en dos segundos» no merece devolverle a nadie un informe
+  // vacio; tres segundos es lo maximo que cabe en el presupuesto de tiempo
+  // de la funcion, y mas de un reintento ya seria insistir donde nos han
+  // dicho que no.
+  const espera = esperaPedida(principal)
+  if (espera !== null && espera <= 3) {
+    await new Promise((listo) => setTimeout(listo, espera * 1000 + 250))
+    principal = await traer(url)
+  }
 
   if (principal.fallo) {
     return { fallo: principal.fallo, url: url.href, redirecciones: principal.redirecciones }
@@ -196,7 +214,18 @@ export async function recoger(entrada) {
     estado: principal.estado,
     pagina: asomada,
   })
-  if (muro) return { muro, url: principal.url, redirecciones: principal.redirecciones }
+  if (muro) {
+    // No tenemos informe, pero todavia podemos averiguar lo que mas le
+    // importa a quien va a trabajar con creadores: si lo que nos rechaza a
+    // nosotros rechaza tambien al robot que dibuja la tarjeta del enlace.
+    const previsualizadores = await Promise.all(
+      AGENTES_PREVIA.map(async (a) => {
+        const r = await intento(principal.url, { metodo: 'GET', agente: a.agente, ms: 5000, bytes: 50_000 })
+        return { id: a.id, nombre: a.nombre, ok: Boolean(r && !r.fallo && r.ok), estado: r?.estado ?? null }
+      }),
+    )
+    return { muro, url: principal.url, redirecciones: principal.redirecciones, previsualizadores }
+  }
 
   if (!principal.ok) {
     return {

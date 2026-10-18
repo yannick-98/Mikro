@@ -108,6 +108,12 @@ tienen su prueba de regresión en `backend/scripts/web-test.js`.
   devolvió el muro de un antibots. Ahora se detectan los dos casos (más «en
   construcción» y la página de fábrica del servidor) y el informe **no lleva
   nota**: se dice qué había ahí y ya está (`web/muro.js`).
+- **Un 429 confundido con un muro antibots.** Una tienda contestó «Too many
+  requests» con `Retry-After: 60` y el informe la acusó de tener un sistema de
+  protección, que es mandar a su dueño a buscar un problema que no tiene. Para
+  decir «hay un antibots» ahora hace falta la huella del sistema o su frase;
+  un código de error a secas es una web ocupada y se cuenta como tal. Si la
+  espera que pide son tres segundos o menos, se espera y se reintenta una vez.
 - **Un número de referencia confundido con un teléfono.** «Nueve cifras que
   empiezan por 6-9» daba por teléfono la referencia de un producto. Ahora hace
   falta prefijo, separadores o la palabra que lo anuncia.
@@ -116,7 +122,23 @@ tienen su prueba de regresión en `backend/scripts/web-test.js`.
 - **«Elige tu horario» tomado por el horario de apertura.** Ahora hacen falta
   días u horas de verdad.
 
-Y una quinta que no es un error sino una decisión: una web montada con
+Y de ese 429 salió lo mejor de todo el módulo. Esa tienda dejaba pasar a
+Chrome y rechazaba a quien se identificara como robot, así que en lugar de
+quedarse en «no hemos podido verla» se le vuelve a preguntar con la cara de
+los robots que dibujan la vista previa de un enlace compartido. Resultado:
+`facebookexternalhit` —el de **Instagram y Facebook**— se comía el mismo
+rechazo, mientras WhatsApp pasaba. Para una tienda que va a trabajar con
+creadores eso no es un detalle técnico: es que el enlace que publique el
+creador puede salir en gris, sin imagen y sin nada en lo que pulsar. Son dos
+peticiones de más en el único caso en el que, si no, no tendríamos nada que
+contar.
+
+Pero **una observación no es un veredicto**. El mismo robot recibió un 429 en
+un intento y un 200 dos minutos después, así que el aviso dice «en este
+intento», no sube el semáforo a rojo y manda a comprobarlo en el depurador de
+enlaces de Meta, que es donde se comprueba de verdad.
+
+Y una decisión que no es un error: una web montada con
 JavaScript llega prácticamente vacía. Lo honrado no es suspenderla, es decir
 que no se ha podido mirar. El informe lo detecta, lo avisa lo primero y marca
 esas comprobaciones como no comprobadas.

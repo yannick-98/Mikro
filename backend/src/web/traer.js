@@ -91,7 +91,7 @@ async function leerConTope(respuesta, tope) {
  * analisis, no errores del programa. Solo lanza si el destino no se puede
  * tocar (eso si es cosa nuestra y no se negocia).
  */
-export async function traer(entrada, { metodo = 'GET', ms = LIMITES.ms, bytes = LIMITES.bytes } = {}) {
+export async function traer(entrada, { metodo = 'GET', ms = LIMITES.ms, bytes = LIMITES.bytes, agente = AGENTE } = {}) {
   const redirecciones = []
   let url = await comprobarDestino(entrada)
   const empiezaTodo = Date.now()
@@ -105,7 +105,7 @@ export async function traer(entrada, { metodo = 'GET', ms = LIMITES.ms, bytes = 
         redirect: 'manual',
         signal: AbortSignal.timeout(ms),
         headers: {
-          'User-Agent': AGENTE,
+          'User-Agent': agente,
           Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
           'Accept-Language': 'es-ES,es;q=0.9',
           'Accept-Encoding': 'gzip, deflate, br',
