@@ -168,7 +168,18 @@ export function informeDeFallo({ url, fallo, estado, redirecciones = [] }) {
     bienHecho: [],
     areas: [],
     sinMirar: [],
-    advertencias: ['No hemos llegado a descargar la página, así que no hay nada más que podamos decirte de ella.'],
+    advertencias: [
+      'No hemos llegado a descargar la página, así que no hay nada más que podamos decirte de ella.',
+      // Preguntamos desde un centro de datos, y hay webs que cierran la
+      // puerta a rangos enteros de servidores sin que su dueno lo sepa. Si
+      // desde el movil carga, el problema no es la web: es a quien deja
+      // entrar. Decirlo evita que alguien salga de aqui pensando que tiene
+      // la web caida cuando sus clientes la ven perfectamente.
+      ...(fallo.tipo === 'desconocido' || fallo.tipo === 'caida' || fallo.tipo === 'lenta'
+        ? ['Preguntamos desde un centro de datos, no desde una conexión doméstica. Ábrela tú en el móvil con los datos: si carga, lo que falla no es tu web sino lo que deja pasar, y eso afecta también a las herramientas de análisis y a los robots que generan la vista previa de tus enlaces.']
+        : []),
+      ...(fallo.codigo ? [`Detalle técnico, para quien lleve la web: ${fallo.codigo}.`] : []),
+    ],
     resumen: { fallos: 1, avisos: 0, correctas: 0, sinMirar: 0 },
   }
 }

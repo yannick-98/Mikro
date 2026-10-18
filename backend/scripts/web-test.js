@@ -327,10 +327,25 @@ check('ninguna comprobacion lanza', vacia.areas.flatMap((a) => a.comprobaciones)
 const rara = analizarHtml('<html><body><img src><a href></a><form></form><script>', { url: 'https://rara.es/' })
 check('etiquetas sin cerrar ni atributos tampoco', rara.areas.length === 6)
 
-const fallo = informeDeFallo({ url: 'https://caida.es/', fallo: { tipo: 'dns', mensaje: 'Ese dominio no resuelve' } })
+const fallo = informeDeFallo({ url: 'https://caida.es/', fallo: { tipo: 'dns', mensaje: 'Ese dominio no resuelve', codigo: 'ENOTFOUND' } })
 check('una web caida da informe igual', fallo.campana.semaforo === 'no')
 check('y dice que es lo unico que importa hoy', fallo.campana.texto.includes('no resuelve'))
 check('sin nota inventada', fallo.nota.total === null)
+
+// El codigo tecnico tiene que llegar al informe. Sin el, un «no hemos podido
+// conectar» no sirve ni para arreglarlo ni para diagnosticarlo: nos paso con
+// una cadena que desde el portatil daba 77 y desde la funcion no conectaba.
+const { clasificarFallo } = await import('../src/web/traer.js')
+check('el codigo viaja con el fallo', clasificarFallo({ cause: { code: 'ECONNRESET' } }).codigo === 'ECONNRESET')
+check('y tambien cuando solo hay nombre', clasificarFallo({ name: 'TimeoutError' }).codigo === 'TimeoutError')
+check('un error pelado no inventa codigo', clasificarFallo(new Error('vaya')).codigo === 'Error')
+check('el informe lo enseña', fallo.advertencias.some((a) => a.includes('ENOTFOUND')))
+
+// Y la salvedad que evita el susto: preguntamos desde un centro de datos.
+const noConecta = informeDeFallo({ url: 'https://x.es/', fallo: { tipo: 'desconocido', mensaje: 'No hemos podido conectar', codigo: 'UND_ERR_SOCKET' } })
+check('avisa de que preguntamos desde un centro de datos', noConecta.advertencias.some((a) => a.includes('centro de datos')))
+check('y manda a abrirla en el móvil', noConecta.advertencias.some((a) => a.includes('móvil')))
+check('eso no aplica a un dominio que no resuelve', !fallo.advertencias.some((a) => a.includes('centro de datos')))
 
 // ---------------------------------------------------------------------------
 console.log('\n--- Cuando no nos dejan ver la web ---')

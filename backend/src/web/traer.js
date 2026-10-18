@@ -210,29 +210,33 @@ export async function traer(entrada, { metodo = 'GET', ms = LIMITES.ms, bytes = 
 export function clasificarFallo(e) {
   const codigo = e?.cause?.code || e?.code || ''
   const nombre = e?.name || ''
+  // El codigo tecnico viaja con el fallo. Tirarlo deja un «no hemos podido
+  // conectar» que no sirve ni para que lo arregle quien lleva la web ni para
+  // que lo diagnostiquemos nosotros, y eso ya nos costo una tarde.
+  const con = (f) => ({ ...f, codigo: String(codigo || nombre || '') || null })
 
   if (nombre === 'TimeoutError' || codigo === 'UND_ERR_CONNECT_TIMEOUT' || codigo === 'ETIMEDOUT') {
-    return { tipo: 'lenta', mensaje: 'Tu web ha tardado más de 8 segundos en contestar' }
+    return con({ tipo: 'lenta', mensaje: 'Tu web ha tardado más de 8 segundos en contestar' })
   }
   if (codigo === 'ENOTFOUND' || codigo === 'EAI_AGAIN') {
-    return { tipo: 'dns', mensaje: 'Ese dominio no resuelve: nadie puede llegar a tu web' }
+    return con({ tipo: 'dns', mensaje: 'Ese dominio no resuelve: nadie puede llegar a tu web' })
   }
   if (codigo === 'ECONNREFUSED' || codigo === 'ECONNRESET') {
-    return { tipo: 'caida', mensaje: 'El servidor ha rechazado la conexión' }
+    return con({ tipo: 'caida', mensaje: 'El servidor ha rechazado la conexión' })
   }
   if (codigo === 'CERT_HAS_EXPIRED') {
-    return { tipo: 'certificado', mensaje: 'El certificado de seguridad ha caducado: el navegador avisa de web no segura' }
+    return con({ tipo: 'certificado', mensaje: 'El certificado de seguridad ha caducado: el navegador avisa de web no segura' })
   }
   if (codigo === 'ERR_TLS_CERT_ALTNAME_INVALID') {
-    return { tipo: 'certificado', mensaje: 'El certificado está emitido para otro dominio' }
+    return con({ tipo: 'certificado', mensaje: 'El certificado está emitido para otro dominio' })
   }
   if (codigo === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE' || codigo === 'SELF_SIGNED_CERT_IN_CHAIN' || codigo === 'DEPTH_ZERO_SELF_SIGNED_CERT') {
-    return { tipo: 'certificado', mensaje: 'El certificado no está firmado por una autoridad reconocida' }
+    return con({ tipo: 'certificado', mensaje: 'El certificado no está firmado por una autoridad reconocida' })
   }
   if (String(codigo).startsWith('ERR_SSL') || String(codigo).includes('CERT')) {
-    return { tipo: 'certificado', mensaje: 'Hay un problema con el certificado de seguridad' }
+    return con({ tipo: 'certificado', mensaje: 'Hay un problema con el certificado de seguridad' })
   }
-  return { tipo: 'desconocido', mensaje: 'No hemos podido conectar con tu web' }
+  return con({ tipo: 'desconocido', mensaje: 'No hemos podido conectar con tu web' })
 }
 
 export default { traer, clasificarFallo, LIMITES, AGENTE }
