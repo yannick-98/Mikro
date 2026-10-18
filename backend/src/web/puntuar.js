@@ -27,8 +27,19 @@ import encontrar from './areas/encontrar.js'
 import movil from './areas/movil.js'
 import velocidad from './areas/velocidad.js'
 
+/**
+ * Devuelve el area aunque el empaquetador la haya envuelto en { default }.
+ *
+ * Es el mismo gato que ya tenia `app.js` con los routers, y mordio igual: en
+ * local todo verde y en produccion un 500 seco, «Cannot read properties of
+ * undefined (reading 'map')», porque `area.comprobaciones` no existia. Al
+ * desplegar como funcion serverless el modulo puede llegar transformado, y un
+ * import por defecto es justo donde se nota.
+ */
+export const desenvolver = (mod) => (mod?.comprobaciones ? mod : mod?.default)
+
 /** El orden es el del informe: de lo que mas decide a lo que menos. */
-export const AREAS = [conversion, confianza, velocidad, movil, campanas, encontrar]
+export const AREAS = [conversion, confianza, velocidad, movil, campanas, encontrar].map(desenvolver)
 
 /** Lo que suma cada estado. */
 const VALOR = { ok: 1, aviso: 0.5, fallo: 0 }

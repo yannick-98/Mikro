@@ -492,7 +492,14 @@ check('se puede olvidar', ritmo('prueba', { veces: 3, segundos: 60 }).ok)
 // ---------------------------------------------------------------------------
 console.log('\n--- Coherencia del catalogo ---')
 
-const { AREAS } = await import('../src/web/puntuar.js')
+const { AREAS, desenvolver } = await import('../src/web/puntuar.js')
+
+// En local todo verde y en produccion un 500 seco: el empaquetador serverless
+// envolvia cada area en { default } y `area.comprobaciones` no existia. Es el
+// mismo gato que ya tenia app.js con los routers.
+check('un area envuelta en { default } se desenvuelve', desenvolver({ default: { comprobaciones: [1] } }).comprobaciones.length === 1)
+check('y una sin envolver pasa tal cual', desenvolver({ comprobaciones: [1, 2] }).comprobaciones.length === 2)
+check('todas las areas llegan con sus comprobaciones', AREAS.every((a) => Array.isArray(a?.comprobaciones)))
 const todas = AREAS.flatMap((a) => a.comprobaciones)
 check('las areas suman 100', AREAS.reduce((s, a) => s + a.peso, 0) === 100, `${AREAS.reduce((s, a) => s + a.peso, 0)}`)
 check('ningun id repetido', new Set(todas.map((c) => c.id)).size === todas.length)
